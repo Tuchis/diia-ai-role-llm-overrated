@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+boto3
+google-auth
+requests
+pydantic
+pydantic-settings
+python-multipart
