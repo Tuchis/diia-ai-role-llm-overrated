@@ -6,4 +6,4 @@ requests
 pydantic
 pydantic-settings
 python-multipart
-https
+httpx
