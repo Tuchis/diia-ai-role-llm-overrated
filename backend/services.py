@@ -72,9 +72,31 @@ def get_or_create_user(user_data):
 
 
 # --- S3 LOGIC ---
+def upload_file_to_s3(user_email: str, filename: str, file_type: str, file_content: bytes):
+    """
+    Upload file directly to S3 through backend.
+    """
+    # Create a unique file path: raw/user@email.com/uuid/filename
+    request_id = str(uuid.uuid4())
+    object_name = f"raw/{user_email}/{request_id}/{filename}"
+
+    try:
+        s3_client.put_object(
+            Bucket=settings.S3_BUCKET_NAME,
+            Key=object_name,
+            Body=file_content,
+            ContentType=file_type
+        )
+        return {"s3_key": object_name, "request_id": request_id}
+    except Exception as e:
+        print(f"Error uploading to S3: {e}")
+        return None
+
+
 def generate_presigned_upload_url(user_email: str, filename: str, file_type: str):
     """
-    Generates a secure URL so Frontend can upload DIRECTLY to S3.
+    DEPRECATED: Generates a secure URL so Frontend can upload DIRECTLY to S3.
+    Kept for backwards compatibility.
     """
     # Create a unique file path: raw/user@email.com/uuid.pdf
     request_id = str(uuid.uuid4())
@@ -96,7 +118,30 @@ def generate_presigned_upload_url(user_email: str, filename: str, file_type: str
         return None
 
 
+def download_file_from_s3(s3_key: str):
+    """
+    Download file from S3 and return file content and metadata.
+    """
+    try:
+        response = s3_client.get_object(
+            Bucket=settings.S3_BUCKET_NAME,
+            Key=s3_key
+        )
+        return {
+            'content': response['Body'].read(),
+            'content_type': response.get('ContentType', 'application/octet-stream'),
+            'filename': s3_key.split('/')[-1]
+        }
+    except Exception as e:
+        print(f"Error downloading from S3: {e}")
+        return None
+
+
 def generate_presigned_download_url(s3_key: str):
+    """
+    DEPRECATED: Generate presigned download URL.
+    Kept for backwards compatibility.
+    """
     try:
         url = s3_client.generate_presigned_url(
             'get_object',
@@ -126,3 +171,26 @@ def create_translation_request(user_email: str, request_id: str, s3_key: str, do
 def get_request_status(request_id: str):
     response = requests_table.get_item(Key={'request_id': request_id})
     return response.get('Item', None)
+
+
+def get_user_documents(user_email: str):
+    """
+    Fetch all documents for a user.
+    Note: This requires a Global Secondary Index (GSI) on user_email in DynamoDB.
+    For MVP, we'll use scan with filter (not recommended for production).
+    """
+    try:
+        # Using scan for MVP - in production, use a GSI query
+        response = requests_table.scan(
+            FilterExpression='user_email = :email',
+            ExpressionAttributeValues={':email': user_email}
+        )
+        items = response.get('Items', [])
+
+        # Sort by created_at descending (newest first)
+        items.sort(key=lambda x: x.get('created_at', 0), reverse=True)
+
+        return items
+    except Exception as e:
+        print(f"Error fetching user documents: {e}")
+        return []

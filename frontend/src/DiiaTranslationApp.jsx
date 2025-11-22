@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
-import { login as apiLogin } from './api';
+import { login as apiLogin, fetchDocuments as apiFetchDocuments, uploadFile, startProcessing, checkStatus } from './api';
 import {
   FileText,
   Upload,
@@ -144,10 +144,102 @@ const Header = ({ user, onLogout, title }) => (
 export default function App() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState('login'); // login, dashboard, upload, detail
-  const [documents, setDocuments] = useState(MOCK_DOCS);
+  const [documents, setDocuments] = useState([]);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+
+  // Load documents from backend
+  const loadDocuments = async () => {
+    try {
+      const data = await apiFetchDocuments();
+
+      // Transform backend data to frontend format
+      const transformedDocs = data.documents.map(doc => ({
+        id: doc.id,
+        title: doc.title,
+        type: doc.type,
+        date: new Date(doc.date * 1000).toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric'
+        }),
+        status: doc.status,
+        originalLang: 'Ukrainian',
+        targetLang: 'English', // TODO: get from backend
+        originalPdf: doc.original_url,
+        translatedPdf: doc.translated_url || null,
+        requestId: doc.id
+      }));
+
+      setDocuments(transformedDocs);
+    } catch (err) {
+      console.error('Error loading documents:', err);
+      setError('Failed to load documents');
+    }
+  };
+
+  // Check for existing session on mount
+  useEffect(() => {
+    const restoreSession = async () => {
+      const credential = localStorage.getItem('google_credential');
+      const userInfoStr = localStorage.getItem('user_info');
+
+      if (credential && userInfoStr) {
+        try {
+          // Restore user info from localStorage
+          const userInfo = JSON.parse(userInfoStr);
+          setUser(userInfo);
+
+          // Try to fetch documents to validate the session
+          const data = await apiFetchDocuments();
+
+          // Transform and set documents
+          const transformedDocs = data.documents.map(doc => ({
+            id: doc.id,
+            title: doc.title,
+            type: doc.type,
+            date: new Date(doc.date * 1000).toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric'
+            }),
+            status: doc.status,
+            originalLang: 'Ukrainian',
+            targetLang: 'English',
+            originalPdf: doc.original_url,
+            translatedPdf: doc.translated_url || null,
+            requestId: doc.id
+          }));
+
+          setDocuments(transformedDocs);
+          setView('dashboard');
+        } catch (err) {
+          console.error('Session restoration failed:', err);
+          // Session is invalid, clear it
+          localStorage.removeItem('google_credential');
+          localStorage.removeItem('user_info');
+          setUser(null);
+        }
+      }
+
+      setIsCheckingSession(false);
+    };
+
+    restoreSession();
+  }, []);
+
+  // Poll for updates on processing documents
+  useEffect(() => {
+    if (view === 'dashboard' && documents.some(doc => doc.status === 'processing')) {
+      const interval = setInterval(() => {
+        loadDocuments();
+      }, 5000); // Poll every 5 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [view, documents]);
 
   // AUTH HANDLERS
   const handleGoogleLoginSuccess = async (credentialResponse) => {
@@ -158,10 +250,15 @@ export default function App() {
       // Send the credential (ID token) to our backend using API utility
       const data = await apiLogin(credentialResponse.credential);
 
-      // Store the credential for authenticated requests
+      // Store the credential and user info for authenticated requests
       localStorage.setItem('google_credential', credentialResponse.credential);
+      localStorage.setItem('user_info', JSON.stringify(data.user));
 
       setUser(data.user);
+
+      // Load user's documents
+      await loadDocuments();
+
       setView('dashboard');
     } catch (err) {
       console.error('Login error:', err);
@@ -178,6 +275,7 @@ export default function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('google_credential');
+    localStorage.removeItem('user_info');
     setUser(null);
     setView('login');
   };
@@ -198,6 +296,15 @@ export default function App() {
   /* --- VIEW: LOGIN ---
   */
   if (view === 'login') {
+    // Show loading while checking for existing session
+    if (isCheckingSession) {
+      return (
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <Loader2 className="animate-spin text-black" size={40} />
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-white flex flex-col font-sans text-black selection:bg-[#FFC2E3]">
         <main className="flex-1 flex flex-col items-center justify-center p-6 relative overflow-hidden">
@@ -328,7 +435,10 @@ export default function App() {
     return (
       <UploadView
         onBack={goDashboard}
-        onComplete={handleCreateDoc}
+        onComplete={async () => {
+          await loadDocuments();
+          setView('dashboard');
+        }}
       />
     );
   }
@@ -392,31 +502,36 @@ const UploadView = ({ onBack, onComplete }) => {
   const [step, setStep] = useState(1); // 1: Select File, 2: Select Language, 3: Review
   const [file, setFile] = useState(null);
   const [selectedLang, setSelectedLang] = useState(null);
-  const [isSimulating, setIsSimulating] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  const fileInputRef = useRef(null);
 
   const handleFileSelect = (e) => {
-    // In a real app, handle file object
-    setFile({ name: 'my_passport_scan.pdf', size: '2.4 MB' });
-    setStep(2);
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      setStep(2);
+    }
   };
 
-  const handleSubmit = () => {
-    setIsSimulating(true);
-    // Simulate API call
-    setTimeout(() => {
-      const newDoc = {
-        id: `doc-${Date.now()}`,
-        title: file.name.split('.')[0] || 'Uploaded Document',
-        type: 'Custom Upload',
-        date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-        status: 'processing',
-        originalLang: 'Ukrainian',
-        targetLang: selectedLang.name,
-        originalPdf: SAMPLE_PDF,
-        translatedPdf: null
-      };
-      onComplete(newDoc);
-    }, 2000);
+  const handleSubmit = async () => {
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      // Step 1: Upload file directly to backend
+      const uploadData = await uploadFile(file, 'custom_upload');
+
+      // Step 2: Notify backend to start processing
+      await startProcessing(uploadData.request_id);
+
+      // Step 3: Complete and reload documents
+      onComplete();
+    } catch (err) {
+      console.error('Upload error:', err);
+      setUploadError(err.message || 'Failed to upload document. Please try again.');
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -451,9 +566,17 @@ const UploadView = ({ onBack, onComplete }) => {
             <div className="w-full text-center space-y-6">
               <h2 className="text-2xl font-bold">Select Document</h2>
 
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept=".pdf,.jpg,.jpeg,.png"
+                className="hidden"
+              />
+
               <div
                 className="w-full h-64 border-2 border-dashed border-gray-300 rounded-[32px] flex flex-col items-center justify-center gap-4 bg-[#F5F5F7] hover:bg-gray-50 hover:border-black transition-colors cursor-pointer group"
-                onClick={handleFileSelect}
+                onClick={() => fileInputRef.current?.click()}
               >
                 <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
                   <Upload size={24} className="text-gray-600" />
@@ -463,6 +586,12 @@ const UploadView = ({ onBack, onComplete }) => {
                   <p className="text-sm text-gray-400">PDF, JPG or PNG up to 10MB</p>
                 </div>
               </div>
+
+              {uploadError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {uploadError}
+                </div>
+              )}
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
@@ -500,13 +629,13 @@ const UploadView = ({ onBack, onComplete }) => {
           {/* STEP 3: REVIEW */}
           {step === 3 && (
             <div className="w-full space-y-8">
-               {isSimulating ? (
+               {isUploading ? (
                  <div className="flex flex-col items-center justify-center py-20 space-y-6">
                    <div className="relative">
                      <div className="w-20 h-20 border-4 border-gray-100 border-t-black rounded-full animate-spin" />
                      <div className="absolute inset-0 flex items-center justify-center font-bold text-xs">DIYA</div>
                    </div>
-                   <h3 className="font-bold text-xl">Sending securely...</h3>
+                   <h3 className="font-bold text-xl">Uploading securely...</h3>
                  </div>
                ) : (
                  <>
@@ -519,7 +648,9 @@ const UploadView = ({ onBack, onComplete }) => {
                       </div>
                       <div className="flex-1">
                         <p className="font-bold">{file?.name}</p>
-                        <p className="text-sm text-gray-400">{file?.size}</p>
+                        <p className="text-sm text-gray-400">
+                          {file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : 'Unknown size'}
+                        </p>
                       </div>
                     </div>
                     <div className="h-px bg-gray-200" />
@@ -534,6 +665,12 @@ const UploadView = ({ onBack, onComplete }) => {
                       <span className="font-bold">~24 Hours</span>
                     </div>
                   </div>
+
+                  {uploadError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                      {uploadError}
+                    </div>
+                  )}
 
                   <div className="fixed bottom-0 left-0 w-full p-6 bg-white border-t border-gray-100">
                     <Button onClick={handleSubmit} className="w-full">
@@ -556,10 +693,103 @@ const UploadView = ({ onBack, onComplete }) => {
 const DocumentDetailView = ({ doc, onBack }) => {
   const [viewMode, setViewMode] = useState('split'); // 'split', 'original', 'translated'
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const [originalPdfUrl, setOriginalPdfUrl] = useState(null);
+  const [translatedPdfUrl, setTranslatedPdfUrl] = useState(null);
+  const [loadingPdfs, setLoadingPdfs] = useState(true);
 
-  const handleDownload = () => {
-    // Mock download
-    alert(`Downloading ${doc.title} (${doc.targetLang}).pdf`);
+  // Fetch PDFs with authentication and create blob URLs
+  useEffect(() => {
+    const fetchPdfs = async () => {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const credential = localStorage.getItem('google_credential');
+
+      if (!credential) {
+        console.error('Not authenticated');
+        setLoadingPdfs(false);
+        return;
+      }
+
+      try {
+        // Fetch original PDF
+        if (doc.originalPdf) {
+          const originalResponse = await fetch(`${API_URL}${doc.originalPdf}`, {
+            headers: { 'Authorization': `Bearer ${credential}` },
+          });
+          if (originalResponse.ok) {
+            const blob = await originalResponse.blob();
+            const url = window.URL.createObjectURL(blob);
+            setOriginalPdfUrl(url);
+          }
+        }
+
+        // Fetch translated PDF if available
+        if (doc.translatedPdf && doc.status === 'completed') {
+          const translatedResponse = await fetch(`${API_URL}${doc.translatedPdf}`, {
+            headers: { 'Authorization': `Bearer ${credential}` },
+          });
+          if (translatedResponse.ok) {
+            const blob = await translatedResponse.blob();
+            const url = window.URL.createObjectURL(blob);
+            setTranslatedPdfUrl(url);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching PDFs:', err);
+      } finally {
+        setLoadingPdfs(false);
+      }
+    };
+
+    fetchPdfs();
+
+    // Cleanup: revoke blob URLs when component unmounts
+    return () => {
+      if (originalPdfUrl) window.URL.revokeObjectURL(originalPdfUrl);
+      if (translatedPdfUrl) window.URL.revokeObjectURL(translatedPdfUrl);
+    };
+  }, [doc]);
+
+  const handleDownload = async () => {
+    try {
+      // Download the translated document if available, otherwise the original
+      const downloadUrl = doc.translatedPdf || doc.originalPdf;
+      if (!downloadUrl) {
+        alert('Download URL not available');
+        return;
+      }
+
+      const credential = localStorage.getItem('google_credential');
+      if (!credential) {
+        alert('Not authenticated. Please log in.');
+        return;
+      }
+
+      // Fetch the file with authentication
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_URL}${downloadUrl}`, {
+        headers: {
+          'Authorization': `Bearer ${credential}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to download file');
+      }
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${doc.title}_${doc.status === 'completed' ? doc.targetLang : 'original'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download error:', err);
+      alert('Failed to download file. Please try again.');
+    }
   };
 
   return (
@@ -620,11 +850,21 @@ const DocumentDetailView = ({ doc, onBack }) => {
              <Maximize2 size={14} className="text-gray-400" />
           </div>
           <div className="flex-1 bg-gray-100 relative">
-             <iframe
-               src={doc.originalPdf}
-               className="w-full h-full border-none"
-               title="Original Document PDF"
-             />
+            {loadingPdfs ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="animate-spin text-gray-400" size={40} />
+              </div>
+            ) : originalPdfUrl ? (
+              <iframe
+                src={originalPdfUrl}
+                className="w-full h-full border-none"
+                title="Original Document PDF"
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-400">
+                Failed to load document
+              </div>
+            )}
           </div>
         </div>
 
@@ -649,11 +889,21 @@ const DocumentDetailView = ({ doc, onBack }) => {
                 <Maximize2 size={14} className="text-[#008F7E]" />
               </div>
               <div className="flex-1 bg-gray-100 relative">
-                <iframe
-                  src={doc.translatedPdf}
-                  className="w-full h-full border-none"
-                  title="Translated Document PDF"
-                />
+                {loadingPdfs ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="animate-spin text-gray-400" size={40} />
+                  </div>
+                ) : translatedPdfUrl ? (
+                  <iframe
+                    src={translatedPdfUrl}
+                    className="w-full h-full border-none"
+                    title="Translated Document PDF"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400">
+                    Failed to load translated document
+                  </div>
+                )}
               </div>
             </>
           ) : (

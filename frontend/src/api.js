@@ -10,7 +10,6 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
  */
 export async function authenticatedFetch(endpoint, options = {}) {
   const credential = localStorage.getItem('google_credential');
-  console.log(credential)
 
     // if (credential) {
     // throw new Error(cre);
@@ -65,18 +64,39 @@ export async function login(credential) {
 }
 
 /**
- * Get presigned URL for file upload
- * @param {object} fileInfo - File information
- * @returns {Promise<object>} Upload URL and metadata
+ * Upload file directly to backend
+ * @param {File} file - File to upload
+ * @param {string} documentType - Type of document
+ * @returns {Promise<object>} Upload result with request_id
  */
-export async function getUploadUrl(fileInfo) {
-  const response = await authenticatedFetch('/documents/upload-url', {
+export async function uploadFile(file, documentType = 'custom_upload') {
+  const credential = localStorage.getItem('google_credential');
+
+  if (!credential) {
+    throw new Error('Not authenticated. Please log in.');
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('document_type', documentType);
+
+  const response = await fetch(`${API_URL}/documents/upload`, {
     method: 'POST',
-    body: JSON.stringify(fileInfo),
+    headers: {
+      'Authorization': `Bearer ${credential}`,
+    },
+    body: formData,
   });
 
+  // Handle 401 Unauthorized - token might be expired
+  if (response.status === 401) {
+    localStorage.removeItem('google_credential');
+    window.location.href = '/';
+    throw new Error('Session expired. Please log in again.');
+  }
+
   if (!response.ok) {
-    throw new Error('Failed to get upload URL');
+    throw new Error('Failed to upload file');
   }
 
   return await response.json();
@@ -117,22 +137,17 @@ export async function checkStatus(requestId) {
 }
 
 /**
- * Upload file to S3 using presigned URL
- * @param {string} uploadUrl - Presigned S3 URL
- * @param {File} file - File to upload
- * @param {string} contentType - File content type
- * @returns {Promise<void>}
+ * Fetch all documents for the current user
+ * @returns {Promise<object>} User's documents
  */
-export async function uploadFileToS3(uploadUrl, file, contentType) {
-  const response = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': contentType,
-    },
-    body: file,
+export async function fetchDocuments() {
+  const response = await authenticatedFetch('/documents', {
+    method: 'GET',
   });
 
   if (!response.ok) {
-    throw new Error('Failed to upload file to S3');
+    throw new Error('Failed to fetch documents');
   }
+
+  return await response.json();
 }
