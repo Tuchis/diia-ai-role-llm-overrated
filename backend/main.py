@@ -1,5 +1,5 @@
 # main.py
-from fastapi import FastAPI, HTTPException, Header, Depends, UploadFile, File
+from fastapi import FastAPI, HTTPException, Header, Depends, UploadFile, File, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -33,6 +33,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- ROUTER SETUP ---
+router = APIRouter()
+
 
 # --- DATA MODELS ---
 class AuthRequest(BaseModel):
@@ -62,7 +65,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
 
 # --- ROUTES ---
 
-@app.post("/auth/login")
+@router.post("/auth/login")
 def login(auth: AuthRequest):
     """
     Frontend sends Google Token -> Backend verifies -> Returns User Profile.
@@ -76,7 +79,7 @@ def login(auth: AuthRequest):
     return {"message": "Login successful", "user": db_user}
 
 
-@app.post("/documents/upload")
+@router.post("/documents/upload")
 async def upload_document(
     file: UploadFile = File(...),
     document_type: str = "custom_upload",
@@ -114,7 +117,7 @@ async def upload_document(
     }
 
 
-@app.post("/documents/{request_id}/start")
+@router.post("/documents/{request_id}/start")
 def start_processing(request_id: str, user=Depends(get_current_user)):
     """
     Step 2: Frontend confirms upload is done. We trigger the AI Core.
@@ -139,7 +142,7 @@ def start_processing(request_id: str, user=Depends(get_current_user)):
     return {"status": "PROCESSING", "message": "Sent to AI Core"}
 
 
-@app.get("/documents/{request_id}")
+@router.get("/documents/{request_id}")
 def check_status(request_id: str, user=Depends(get_current_user)):
     """
     Step 3: Polling. Frontend checks this every 2 seconds.
@@ -159,7 +162,7 @@ def check_status(request_id: str, user=Depends(get_current_user)):
     }
 
 
-@app.get("/documents/{request_id}/download/original")
+@router.get("/documents/{request_id}/download/original")
 def download_original(request_id: str, user=Depends(get_current_user)):
     """
     Download the original document for a request.
@@ -190,7 +193,7 @@ def download_original(request_id: str, user=Depends(get_current_user)):
     )
 
 
-@app.get("/documents/{request_id}/download/translated")
+@router.get("/documents/{request_id}/download/translated")
 def download_translated(request_id: str, user=Depends(get_current_user)):
     """
     Download the translated document for a request.
@@ -224,7 +227,7 @@ def download_translated(request_id: str, user=Depends(get_current_user)):
     )
 
 
-@app.get("/documents")
+@router.get("/documents")
 def get_user_documents(user=Depends(get_current_user)):
     """
     Fetch all documents for the authenticated user.
@@ -254,3 +257,5 @@ def get_user_documents(user=Depends(get_current_user)):
         result.append(item)
 
     return {"documents": result}
+
+app.include_router(router, prefix="/app")
