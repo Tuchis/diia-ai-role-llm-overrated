@@ -386,7 +386,7 @@ export default function App() {
             <div className="relative z-10 w-full sm:w-auto">
               <Button
                 variant="primary"
-                className="bg-white text-black hover:bg-gray-200 shadow-none w-full sm:w-auto"
+                className="bg-gradient-to-r from-[#D4F4E4] to-[#E3D4F4] text-black hover:from-[#C4E4D4] hover:to-[#D3C4E4] shadow-lg w-full sm:w-auto"
                 onClick={() => setView('upload')}
                 icon={Plus}
               >
