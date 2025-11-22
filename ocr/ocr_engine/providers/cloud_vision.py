@@ -2,7 +2,6 @@ from typing import List
 from google.cloud import vision
 from ..base import OCRProvider
 from ..models import OCRDocument, OCRBlock
-import os
 
 class CloudVisionOCRProvider(OCRProvider):
     """
