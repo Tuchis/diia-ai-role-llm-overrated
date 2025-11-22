@@ -1,6 +1,7 @@
 # config.py
 from pydantic_settings import BaseSettings
 from typing import Optional
+import os
 
 
 class Settings(BaseSettings):
@@ -20,6 +21,9 @@ class Settings(BaseSettings):
 
     # Core AI Service (The GPU machine)
     CORE_AI_URL: str = "http://localhost:8080"  # Placeholder for now
+
+    TRANSLATION_ENDPOINT: str | None = os.getenv("TRANSLATION_ENDPOINT")
+    OCR_ENDPOINT: str | None = os.getenv("OCR_ENDPOINT")
 
     class Config:
         env_file = ".env"

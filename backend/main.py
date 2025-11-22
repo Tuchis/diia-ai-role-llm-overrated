@@ -7,6 +7,8 @@ from typing import Optional
 import services
 import requests  # To call the Core AI service
 import io
+from config import settings
+from helper import translate_batch
 
 app = FastAPI(title="Diia Translation Service MVP")
 
