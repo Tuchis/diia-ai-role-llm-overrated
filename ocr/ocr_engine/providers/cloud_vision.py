@@ -3,14 +3,20 @@ from google.cloud import vision
 from ..base import OCRProvider
 from ..models import OCRDocument, OCRBlock
 
+
+def _clamp(x: float, min_v: float, max_v: float) -> float:
+    return max(min_v, min(x, max_v))
+
+
 class CloudVisionOCRProvider(OCRProvider):
     """
     Google Cloud Vision OCR Provider.
     Requires GOOGLE_APPLICATION_CREDENTIALS to be configured in the environment.
     """
 
-    def __init__(self):
+    def __init__(self, bbox_offset: float = 0.001):
         self.client = vision.ImageAnnotatorClient()
+        self.bbox_offset = bbox_offset
 
     def process(self, document: OCRDocument) -> None:
         for page in document.pages:
@@ -46,7 +52,9 @@ class CloudVisionOCRProvider(OCRProvider):
 
                             for word in paragraph.words:
                                 # Build word text and preserve spacing based on detected break after each symbol
-                                word_text = "".join([symbol.text for symbol in word.symbols])
+                                word_text = "".join(
+                                    [symbol.text for symbol in word.symbols]
+                                )
                                 # Determine spacing after the word based on the break type of the last symbol
                                 last_symbol = word.symbols[-1]
                                 break_type = last_symbol.property.detected_break.type
@@ -90,6 +98,15 @@ class CloudVisionOCRProvider(OCRProvider):
                 print(f"Error processing page {page.page_number}: {e}")
                 continue
 
+    def _extend_bbox(
+        self, xywh: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        x, y, w, h = xywh
+
+        x, y = _clamp(x - self.bbox_offset, 0, 1), _clamp(y - self.bbox_offset, 0, 1)
+        w, h = _clamp(w + 2 * self.bbox_offset, 0, 1 - x), _clamp(h + 2 * self.bbox_offset, 0, 1 - y)
+        return x, y, w, h
+
     def _add_line_block(self, blocks, text_parts, words, page_width, page_height):
         if not words:
             return
@@ -114,6 +131,8 @@ class CloudVisionOCRProvider(OCRProvider):
 
         width = max_x - min_x
         height = max_y - min_y
+
+        min_x, min_y, width, height = self._extend_bbox((min_x, min_y, width, height))
 
         polygon = [
             {"X": min_x, "Y": min_y},

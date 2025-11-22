@@ -4,15 +4,31 @@ import fitz  # pymupdf
 from urllib.parse import urlparse, unquote
 from pathlib import Path
 
+
 class OCRBlock(BaseModel):
     text: str
     confidence: float
     geometry: Optional[Dict[str, Any]] = None
 
+    def decode_bbox_xywh(self) -> tuple[float, float, float, float]:
+        if self.geometry is None:
+            raise ValueError("Geometry is not available")
+
+        return (
+            self.geometry["BoundingBox"]["Left"],
+            self.geometry["BoundingBox"]["Top"],
+            self.geometry["BoundingBox"]["Width"],
+            self.geometry["BoundingBox"]["Height"],
+        )
+
+
 class OCRPage(BaseModel):
     page_number: int
-    image_bytes: bytes = Field(default=b"", exclude=True) # Exclude from JSON dump by default to avoid massive output
+    image_bytes: bytes = Field(
+        default=b"", exclude=True
+    )  # Exclude from JSON dump by default to avoid massive output
     blocks: List[OCRBlock] = []
+
 
 class OCRDocument(BaseModel):
     uri: str
@@ -26,9 +42,11 @@ class OCRDocument(BaseModel):
         Supports file:// and s3:// schemes.
         """
         parsed = urlparse(uri)
-        
+
         if not parsed.scheme:
-             raise ValueError(f"Invalid URI: {uri}. Must contain a scheme (e.g., file://)")
+            raise ValueError(
+                f"Invalid URI: {uri}. Must contain a scheme (e.g., file://)"
+            )
 
         if parsed.scheme == "file":
             file_path = unquote(parsed.path)
@@ -36,6 +54,7 @@ class OCRDocument(BaseModel):
                 return f.read()
         elif parsed.scheme == "s3":
             import boto3
+
             s3 = boto3.client("s3")
             bucket = parsed.netloc
             key = parsed.path.lstrip("/")
@@ -46,7 +65,9 @@ class OCRDocument(BaseModel):
 
     def _load_page_images(self):
         if self.file_format == "pdf":
-            with fitz.open(stream=self._read_file_content(self.uri), filetype="pdf") as doc:
+            with fitz.open(
+                stream=self._read_file_content(self.uri), filetype="pdf"
+            ) as doc:
                 for i, page in enumerate(doc):
                     pix = page.get_pixmap(dpi=300)
                     self.pages[i].image_bytes = pix.tobytes("png")
@@ -61,24 +82,24 @@ class OCRDocument(BaseModel):
         """
         file_bytes = cls._read_file_content(uri)
         pages = []
-        
+
         # Determine file type from extension
         parsed = urlparse(uri)
         path = unquote(parsed.path)
         ext = Path(path).suffix.lower().lstrip(".")
         file_format = ext if ext else "unknown"
-        
+
         is_pdf = file_format == "pdf"
-        
+
         if is_pdf:
             # Open PDF from bytes
             with fitz.open(stream=file_bytes, filetype="pdf") as doc:
                 for i, _ in enumerate(doc):
-                    pages.append(OCRPage(page_number=i+1))
+                    pages.append(OCRPage(page_number=i + 1))
         else:
             # Assume image
             pages.append(OCRPage(page_number=1))
-            
+
         doc = cls(uri=uri, pages=pages, file_format=file_format)
         doc._load_page_images()
         return doc
@@ -97,5 +118,3 @@ class OCRDocument(BaseModel):
         doc = cls.model_validate_json(json_str)
         doc._load_page_images()
         return doc
-
-

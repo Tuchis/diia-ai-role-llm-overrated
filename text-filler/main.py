@@ -33,11 +33,11 @@ def process(uri_or_path, visualize):
     # with open("output.json", "w") as f:
     #     f.write(document.to_json())
 
-    with open("test-google.json", "r") as f:
+    with open("test-diploma-google.json", "r") as f:
         document = OCRDocument.from_json(f.read())
     
     # Output JSON (excluding image bytes)
-    print(document.model_dump_json(indent=2))
+    # print(document.model_dump_json(indent=2))
 
     if visualize:
         visualize_results(document)

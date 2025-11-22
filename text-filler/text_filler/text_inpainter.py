@@ -13,6 +13,8 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
+from .background_inpainter import DummyInpainter, BackgroundInpainterV1, BackgroundInpainterV2, BackgroundInpainterV3
+
 
 # Register the font once
 try:
@@ -25,24 +27,11 @@ Align = Literal["left", "right", "center", "justify"]
 
 class TextInpainter:
     def __init__(self, document: OCRDocument):
-        self.document = document
-        self.text_ops: Dict[int, List[Dict[str, Any]]] = {}
+        self.text_ops: dict[int, list[dict[str, Any]]] = {}
 
-        with io.BytesIO(document._read_file_content(document.uri)) as stream:
-            tmp_document = fitz.open(stream=stream)
-
-            if tmp_document.is_pdf:
-                self.fitz_document = tmp_document
-            else:
-                self.fitz_document = fitz.open()
-                rect = tmp_document[0].rect  # image dimensions
-
-                page: fitz.Page = self.fitz_document.new_page(
-                    width=rect.width, height=rect.height
-                )
-
-                page.insert_image(rect, stream=stream)
-                tmp_document.close()
+        # bkg_inpainter = DummyInpainter(document)
+        bkg_inpainter = BackgroundInpainterV2(document)
+        self.document, self.fitz_document = bkg_inpainter.inpaint()
 
     @staticmethod
     def from_document(document: OCRDocument) -> "TextInpainter":
@@ -136,10 +125,10 @@ class TextInpainter:
             rl_height = rect.height
 
             # Draw white background
-            c.saveState()
-            c.setFillColorRGB(1, 1, 1)
-            c.rect(rl_x, rl_y, rl_width, rl_height, fill=1, stroke=0)
-            c.restoreState()
+            # c.saveState()
+            # c.setFillColorRGB(1, 1, 1)
+            # c.rect(rl_x, rl_y, rl_width, rl_height, fill=1, stroke=0)
+            # c.restoreState()
 
             style.alignment = TA_JUSTIFY
             style.fontSize = rl_height * 0.75
