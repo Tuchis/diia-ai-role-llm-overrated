@@ -46,7 +46,7 @@ export async function authenticatedFetch(endpoint, options = {}) {
  * @returns {Promise<object>} User data
  */
 export async function login(credential) {
-  const response = await fetch(`${API_URL}/auth/login`, {
+  const response = await fetch(`${API_URL}/api/auth/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
