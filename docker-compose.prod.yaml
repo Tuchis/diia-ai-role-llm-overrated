@@ -35,9 +35,9 @@ services:
     restart: always
     ports:
       - "80:80"
-    depends_on:
-      backend:
-        condition: service_healthy
+#    depends_on:
+#      backend:
+#        condition: service_healthy
     env_file:
       - ./frontend/.env
     healthcheck:
