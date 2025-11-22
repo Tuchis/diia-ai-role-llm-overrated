@@ -44,6 +44,15 @@ class OCRDocument(BaseModel):
         else:
             raise ValueError(f"Unsupported scheme: {parsed.scheme}")
 
+    def _load_page_images(self):
+        if self.file_format == "pdf":
+            with fitz.open(stream=self._read_file_content(self.uri), filetype="pdf") as doc:
+                for i, page in enumerate(doc):
+                    pix = page.get_pixmap(dpi=300)
+                    self.pages[i].image_bytes = pix.tobytes("png")
+        else:
+            self.pages[0].image_bytes = self._read_file_content(self.uri)
+
     @classmethod
     def from_uri(cls, uri: str, dpi: int = 300) -> "OCRDocument":
         """
@@ -64,16 +73,15 @@ class OCRDocument(BaseModel):
         if is_pdf:
             # Open PDF from bytes
             with fitz.open(stream=file_bytes, filetype="pdf") as doc:
-                for i, page in enumerate(doc):
-                    # Render page to image (pixmap)
-                    pix = page.get_pixmap(dpi=dpi) # High DPI for better OCR
-                    image_bytes = pix.tobytes("png")
-                    pages.append(OCRPage(page_number=i+1, image_bytes=image_bytes))
+                for i, _ in enumerate(doc):
+                    pages.append(OCRPage(page_number=i+1))
         else:
             # Assume image
-            pages.append(OCRPage(page_number=1, image_bytes=file_bytes))
+            pages.append(OCRPage(page_number=1))
             
-        return cls(uri=uri, pages=pages, file_format=file_format)
+        doc = cls(uri=uri, pages=pages, file_format=file_format)
+        doc._load_page_images()
+        return doc
 
     def to_json(self) -> str:
         """
@@ -86,4 +94,8 @@ class OCRDocument(BaseModel):
         """
         Deserializes an OCRDocument from a JSON string.
         """
-        return cls.model_validate_json(json_str)
+        doc = cls.model_validate_json(json_str)
+        doc._load_page_images()
+        return doc
+
+
