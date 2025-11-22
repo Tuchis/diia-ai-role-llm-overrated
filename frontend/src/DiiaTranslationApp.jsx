@@ -18,7 +18,9 @@ import {
   User,
   LogOut,
   ScanLine,
-  Maximize2
+  Maximize2,
+  Camera,
+  RotateCw
 } from 'lucide-react';
 
 /* --- MOCK DATA & ASSETS ---
@@ -507,6 +509,169 @@ const DocumentCard = ({ doc, onClick }) => {
   );
 };
 
+/* --- SUB-COMPONENT: CAMERA CAPTURE ---
+*/
+const CameraCapture = ({ onCapture, onClose }) => {
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [stream, setStream] = useState(null);
+  const [error, setError] = useState(null);
+  const [capturing, setCapturing] = useState(false);
+  const [facingMode, setFacingMode] = useState('environment'); // 'user' for front camera, 'environment' for back
+
+  useEffect(() => {
+    startCamera();
+    return () => {
+      stopCamera();
+    };
+  }, [facingMode]);
+
+  const startCamera = async () => {
+    try {
+      setError(null);
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: facingMode,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      });
+      setStream(mediaStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+    } catch (err) {
+      console.error('Camera error:', err);
+      setError('Unable to access camera. Please check permissions.');
+    }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+  };
+
+  const switchCamera = () => {
+    setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
+  };
+
+  const capturePhoto = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    setCapturing(true);
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+
+    // Set canvas dimensions to match video
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    // Draw video frame to canvas
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Convert canvas to blob
+    canvas.toBlob((blob) => {
+      if (blob) {
+        // Create a File object from the blob
+        const file = new File([blob], `scan_${Date.now()}.jpg`, {
+          type: 'image/jpeg',
+          lastModified: Date.now()
+        });
+
+        stopCamera();
+        onCapture(file);
+      }
+      setCapturing(false);
+    }, 'image/jpeg', 0.95);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black z-50 flex flex-col">
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/50 to-transparent p-4 flex items-center justify-between">
+        <button
+          onClick={() => {
+            stopCamera();
+            onClose();
+          }}
+          className="p-2 text-white hover:bg-white/20 rounded-full transition-colors"
+        >
+          <X size={24} />
+        </button>
+        <span className="text-white font-bold">Scan Document</span>
+        <button
+          onClick={switchCamera}
+          className="p-2 text-white hover:bg-white/20 rounded-full transition-colors"
+        >
+          <RotateCw size={24} />
+        </button>
+      </div>
+
+      {/* Camera View */}
+      <div className="flex-1 relative overflow-hidden">
+        {error ? (
+          <div className="absolute inset-0 flex items-center justify-center text-white text-center p-6">
+            <div className="space-y-4">
+              <Camera size={48} className="mx-auto opacity-50" />
+              <p className="text-lg">{error}</p>
+              <button
+                onClick={() => {
+                  stopCamera();
+                  onClose();
+                }}
+                className="px-6 py-3 bg-white text-black rounded-full font-bold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              className="w-full h-full object-cover"
+            />
+            <canvas ref={canvasRef} className="hidden" />
+
+            {/* Document Frame Overlay */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="relative w-full h-full">
+                <div className="absolute top-4 left-4 w-12 h-12 border-t-4 border-l-4 border-white" />
+                <div className="absolute top-4 right-4 w-12 h-12 border-t-4 border-r-4 border-white" />
+                <div className="absolute bottom-24 left-4 w-12 h-12 border-b-4 border-l-4 border-white" />
+                <div className="absolute bottom-24 right-4 w-12 h-12 border-b-4 border-r-4 border-white" />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Capture Button */}
+      {!error && (
+        <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/50 to-transparent p-8 flex flex-col items-center gap-4">
+          <p className="text-white text-sm text-center">Position the document within the frame</p>
+          <button
+            onClick={capturePhoto}
+            disabled={capturing}
+            className="w-20 h-20 rounded-full bg-white border-4 border-white/30 flex items-center justify-center active:scale-90 transition-transform disabled:opacity-50"
+          >
+            {capturing ? (
+              <Loader2 className="animate-spin text-black" size={32} />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-white border-4 border-black" />
+            )}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* --- SUB-VIEW: UPLOAD ---
 */
 const UploadView = ({ onBack, onComplete }) => {
@@ -515,6 +680,7 @@ const UploadView = ({ onBack, onComplete }) => {
   const [selectedLang, setSelectedLang] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
+  const [showCamera, setShowCamera] = useState(false);
   const fileInputRef = useRef(null);
 
   const handleFileSelect = (e) => {
@@ -523,6 +689,16 @@ const UploadView = ({ onBack, onComplete }) => {
       setFile(selectedFile);
       setStep(2);
     }
+  };
+
+  const handleCameraCapture = (capturedFile) => {
+    setFile(capturedFile);
+    setShowCamera(false);
+    setStep(2);
+  };
+
+  const openCamera = () => {
+    setShowCamera(true);
   };
 
   const handleSubmit = async () => {
@@ -547,6 +723,14 @@ const UploadView = ({ onBack, onComplete }) => {
 
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans">
+      {/* Camera Capture Modal */}
+      {showCamera && (
+        <CameraCapture
+          onCapture={handleCameraCapture}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
+
       {/* Header */}
       <div className="h-16 flex items-center px-4 border-b border-gray-100">
         <button onClick={onBack} className="p-2 -ml-2 hover:bg-gray-100 rounded-full">
@@ -609,7 +793,7 @@ const UploadView = ({ onBack, onComplete }) => {
                 <div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">Or import from</span></div>
               </div>
 
-              <Button variant="secondary" className="w-full" icon={ScanLine}>
+              <Button variant="secondary" className="w-full" icon={ScanLine} onClick={openCamera}>
                 Scan with Camera
               </Button>
             </div>
