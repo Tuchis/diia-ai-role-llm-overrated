@@ -23,8 +23,8 @@ app.add_middleware(
         "http://localhost",
         "http://98.95.171.9",
         "http://98.95.171.9:80",
-        "http://www.diia-translation.com/",
-        "http://diia-translation.com/"
+        "http://www.diia-translation.com",
+        "http://diia-translation.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],
