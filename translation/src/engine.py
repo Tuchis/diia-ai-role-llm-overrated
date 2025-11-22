@@ -34,6 +34,7 @@ class TranslationEngine:
                             f"You are a professional translator. "
                             f"Translate the following text from {source} to {target}. "
                             f"Return ONLY the translated text without quotes or explanations."
+                            f"Preserve date format."
                         )
                     },
                     {"role": "user", "content": text}
