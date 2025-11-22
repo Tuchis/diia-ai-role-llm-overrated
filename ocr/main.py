@@ -1,10 +1,8 @@
 import click
-import os
 from dotenv import load_dotenv
-from ocr_engine import process_document, visualize_results
+from ocr_engine import OCREngine, TextractOCRProvider, visualize_results
 
 load_dotenv()
-
 
 @click.command()
 @click.argument("file_path", type=click.Path(exists=True))
@@ -17,12 +15,22 @@ def process(file_path, visualize):
     """
     Process a document and perform OCR.
     """
-    result = process_document(file_path)
-    print(result.model_dump_json(indent=2))
+    # Configure provider
+    provider = TextractOCRProvider()
+    engine = OCREngine(provider=provider)
+    
+    # Process
+    try:
+        document = engine.process(file_path)
+        
+        # Output JSON (excluding image bytes)
+        print(document.model_dump_json(indent=2))
 
-    if visualize:
-        visualize_results(file_path, result)
+        if visualize:
+            visualize_results(document)
 
+    except Exception as e:
+        click.echo(f"Error processing document: {e}", err=True)
 
 if __name__ == "__main__":
     process()
