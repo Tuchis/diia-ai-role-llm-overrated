@@ -21,6 +21,10 @@ app.add_middleware(
         "http://localhost:80",
         "http://127.0.0.1:80",
         "http://localhost",
+        "http://98.95.171.9",
+        "http://98.95.171.9:80",
+        "http://www.diia-translation.com/",
+        "http://diia-translation.com/"
     ],
     allow_credentials=True,
     allow_methods=["*"],
