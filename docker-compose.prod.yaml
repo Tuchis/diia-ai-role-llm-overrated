@@ -7,9 +7,7 @@ services:
     container_name: diia_backend
     restart: always
     ports:
-      - "443:443"
-    volumes:
-      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - "8000:8000"
     env_file:
       - ./backend/.env
     environment:
@@ -34,9 +32,6 @@ services:
     restart: always
     ports:
       - "80:80"
-      - "443:443"
-#    volumes:
-#      - /etc/letsencrypt:/etc/letsencrypt:ro
 #    depends_on:
 #      backend:
 #        condition: service_healthy
