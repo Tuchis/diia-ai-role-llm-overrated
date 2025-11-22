@@ -907,7 +907,7 @@ const DocumentDetailView = ({ doc, onBack }) => {
       try {
         // Fetch original PDF
         if (doc.originalPdf) {
-          const originalResponse = await fetch(`${API_URL}${doc.originalPdf}`, {
+          const originalResponse = await fetch(`${API_URL}/api${doc.originalPdf}`, {
             headers: { 'Authorization': `Bearer ${credential}` },
           });
           if (originalResponse.ok) {
@@ -919,7 +919,7 @@ const DocumentDetailView = ({ doc, onBack }) => {
 
         // Fetch translated PDF if available
         if (doc.translatedPdf && doc.status === 'completed') {
-          const translatedResponse = await fetch(`${API_URL}${doc.translatedPdf}`, {
+          const translatedResponse = await fetch(`${API_URL}/api${doc.translatedPdf}`, {
             headers: { 'Authorization': `Bearer ${credential}` },
           });
           if (translatedResponse.ok) {
@@ -961,7 +961,7 @@ const DocumentDetailView = ({ doc, onBack }) => {
 
       // Fetch the file with authentication
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_URL}${downloadUrl}`, {
+      const response = await fetch(`${API_URL}/api${downloadUrl}`, {
         headers: {
           'Authorization': `Bearer ${credential}`,
         },
