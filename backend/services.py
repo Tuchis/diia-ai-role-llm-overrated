@@ -13,6 +13,7 @@ s3_client = boto3.client(
     's3',
     aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
     aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+    aws_session_token=settings.AWS_SESSION_TOKEN,
     region_name=settings.AWS_REGION,
     config=Config(signature_version='s3v4')
 )
@@ -21,6 +22,7 @@ dynamo_client = boto3.resource(
     'dynamodb',
     aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
     aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+    aws_session_token=settings.AWS_SESSION_TOKEN,
     region_name=settings.AWS_REGION
 )
 

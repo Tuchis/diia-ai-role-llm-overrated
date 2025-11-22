@@ -8,6 +8,23 @@ import requests  # To call the Core AI service
 
 app = FastAPI(title="Diia Translation Service MVP")
 
+# Allow your frontend to talk to your backend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:80",
+        "http://127.0.0.1:80",
+        "http://localhost",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # --- DATA MODELS ---
 class AuthRequest(BaseModel):
@@ -116,16 +133,3 @@ def check_status(request_id: str, user=Depends(get_current_user)):
         "status": item.get('status'),
         "download_url": download_url
     }
-
-
-
-app = FastAPI()
-
-# Allow your frontend to talk to your backend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"], # Your Frontend URL
-    allow_credentials=True,
-    allow_methods=["*"], # Allow POST, GET, OPTIONS, etc.
-    allow_headers=["*"],
-)

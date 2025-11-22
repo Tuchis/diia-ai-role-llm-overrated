@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # 1. Your FastAPI Backend
+  backend:
+    build: ./backend
+    container_name: diia_backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env  # Loads your AWS/Google keys automatically
+    depends_on:
+      - dynamodb-local
+
+  # 2. Local DynamoDB (for testing without AWS costs)
+  dynamodb-local:
+    image: amazon/dynamodb-local
+    container_name: diia_db
+    ports:
+      - "8001:8000" # Changed to avoid conflict with backend
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ."
+
+  # 3. Frontend - React/Vite Application
+  frontend:
+    build: ./frontend
+    container_name: diia_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    env_file:
+      - ./frontend/.env

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { GoogleLogin } from '@react-oauth/google';
+import { login as apiLogin } from './api';
 import {
   FileText,
   Upload,
@@ -23,7 +25,7 @@ import {
   Simulating backend responses
 */
 // Using a standard W3C dummy PDF for visualization
-const SAMPLE_PDF = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
+const SAMPLE_PDF = "https://www.buds.com.ua/images/Lorem_ipsum.pdf";
 
 const MOCK_DOCS = [
   {
@@ -145,18 +147,37 @@ export default function App() {
   const [documents, setDocuments] = useState(MOCK_DOCS);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // AUTH HANDLERS
-  const handleLogin = () => {
+  const handleGoogleLoginSuccess = async (credentialResponse) => {
     setLoading(true);
-    setTimeout(() => {
-      setUser({ name: 'Oleksandr K.', email: 'alex.k@gmail.com' });
+    setError(null);
+
+    try {
+      // Send the credential (ID token) to our backend using API utility
+      const data = await apiLogin(credentialResponse.credential);
+
+      // Store the credential for authenticated requests
+      localStorage.setItem('google_credential', credentialResponse.credential);
+
+      setUser(data.user);
       setView('dashboard');
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(err.message || 'Failed to log in. Please try again.');
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
+  };
+
+  const handleGoogleLoginError = () => {
+    setLoading(false);
+    setError('Google login failed. Please try again.');
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('google_credential');
     setUser(null);
     setView('login');
   };
@@ -200,22 +221,32 @@ export default function App() {
             </div>
 
             <div className="w-full pt-8 space-y-4">
-              <button
-                onClick={handleLogin}
-                disabled={loading}
-                className="w-full h-16 bg-white border-2 border-black/10 hover:border-black hover:bg-gray-50 rounded-full flex items-center justify-center gap-3 transition-all group shadow-sm"
-              >
-                {loading ? (
-                  <Loader2 className="animate-spin text-black" />
-                ) : (
-                  <>
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="G" className="w-6 h-6" />
-                    <span className="font-bold text-lg">Continue with Google</span>
-                  </>
-                )}
-              </button>
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
 
-              <p className="text-xs text-gray-400 font-medium">
+              {loading ? (
+                <div className="w-full h-16 bg-white border-2 border-black/10 rounded-full flex items-center justify-center">
+                  <Loader2 className="animate-spin text-black" />
+                </div>
+              ) : (
+                <div className="flex justify-center">
+                  <GoogleLogin
+                    onSuccess={handleGoogleLoginSuccess}
+                    onError={handleGoogleLoginError}
+                    useOneTap
+                    theme="outline"
+                    size="large"
+                    text="continue_with"
+                    shape="pill"
+                    width="100%"
+                  />
+                </div>
+              )}
+
+              <p className="text-xs text-gray-400 font-medium text-center">
                 By continuing, you accept the Terms of Service
               </p>
             </div>

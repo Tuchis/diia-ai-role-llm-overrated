@@ -6,7 +6,8 @@ class Settings(BaseSettings):
     # AWS Credentials
     AWS_ACCESS_KEY_ID: str
     AWS_SECRET_ACCESS_KEY: str
-    AWS_REGION: str = "eu-central-1"  # Or your preferred region
+    AWS_SESSION_TOKEN: str
+    AWS_REGION: str = "us-east-1"  # Or your preferred region
 
     # Resource Names
     S3_BUCKET_NAME: str
@@ -24,3 +25,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+print(settings.AWS_REGION)
