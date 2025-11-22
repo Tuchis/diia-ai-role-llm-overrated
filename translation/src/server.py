@@ -62,7 +62,6 @@ async def get_languages():
 
 
 if __name__ == "__main__":
-    print("Starting Translation Microservice on http://localhost:8000")
-    print("Docs available at http://localhost:8000/docs")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    print("Starting Translation Microservice on http://localhost:7777")
+    uvicorn.run(app, host="0.0.0.0", port=7777)
 
