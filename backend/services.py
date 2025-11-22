@@ -9,22 +9,32 @@ from config import settings
 
 # --- AWS CLIENTS ---
 # We use a specific signature version for Presigned URLs to work correctly
-s3_client = boto3.client(
-    's3',
-    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-    aws_session_token=settings.AWS_SESSION_TOKEN,
-    region_name=settings.AWS_REGION,
-    config=Config(signature_version='s3v4')
-)
+# If credentials are provided in env vars, use them. Otherwise, boto3 will use IAM role.
+def _create_s3_client():
+    kwargs = {
+        'region_name': settings.AWS_REGION,
+        'config': Config(signature_version='s3v4')
+    }
+    # Only pass credentials if they are explicitly provided
+    if settings.AWS_ACCESS_KEY_ID:
+        kwargs['aws_access_key_id'] = settings.AWS_ACCESS_KEY_ID
+        kwargs['aws_secret_access_key'] = settings.AWS_SECRET_ACCESS_KEY
+        if settings.AWS_SESSION_TOKEN:
+            kwargs['aws_session_token'] = settings.AWS_SESSION_TOKEN
+    return boto3.client('s3', **kwargs)
 
-dynamo_client = boto3.resource(
-    'dynamodb',
-    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-    aws_session_token=settings.AWS_SESSION_TOKEN,
-    region_name=settings.AWS_REGION
-)
+def _create_dynamodb_client():
+    kwargs = {'region_name': settings.AWS_REGION}
+    # Only pass credentials if they are explicitly provided
+    if settings.AWS_ACCESS_KEY_ID:
+        kwargs['aws_access_key_id'] = settings.AWS_ACCESS_KEY_ID
+        kwargs['aws_secret_access_key'] = settings.AWS_SECRET_ACCESS_KEY
+        if settings.AWS_SESSION_TOKEN:
+            kwargs['aws_session_token'] = settings.AWS_SESSION_TOKEN
+    return boto3.resource('dynamodb', **kwargs)
+
+s3_client = _create_s3_client()
+dynamo_client = _create_dynamodb_client()
 
 users_table = dynamo_client.Table(settings.DYNAMODB_USERS_TABLE)
 requests_table = dynamo_client.Table(settings.DYNAMODB_REQUESTS_TABLE)

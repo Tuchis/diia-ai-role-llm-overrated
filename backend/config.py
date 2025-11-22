@@ -1,12 +1,13 @@
 # config.py
 from pydantic_settings import BaseSettings
+from typing import Optional
 
 
 class Settings(BaseSettings):
-    # AWS Credentials
-    AWS_ACCESS_KEY_ID: str
-    AWS_SECRET_ACCESS_KEY: str
-    AWS_SESSION_TOKEN: str
+    # AWS Credentials (Optional - will use IAM role if not provided)
+    AWS_ACCESS_KEY_ID: Optional[str] = None
+    AWS_SECRET_ACCESS_KEY: Optional[str] = None
+    AWS_SESSION_TOKEN: Optional[str] = None
     AWS_REGION: str = "us-east-1"  # Or your preferred region
 
     # Resource Names
@@ -25,4 +26,5 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-print(settings.AWS_REGION)
+print(f"AWS Region: {settings.AWS_REGION}")
+print(f"Using explicit credentials: {settings.AWS_ACCESS_KEY_ID is not None}")
