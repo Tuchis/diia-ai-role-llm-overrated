@@ -25,7 +25,7 @@ export async function authenticatedFetch(endpoint, options = {}) {
     ...options.headers,
   };
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  const response = await fetch(`${API_URL}/api${endpoint}`, {
     ...options,
     headers,
   });
@@ -80,7 +80,7 @@ export async function uploadFile(file, documentType = 'custom_upload') {
   formData.append('file', file);
   formData.append('document_type', documentType);
 
-  const response = await fetch(`${API_URL}/documents/upload`, {
+  const response = await fetch(`${API_URL}/api/documents/upload`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${credential}`,
