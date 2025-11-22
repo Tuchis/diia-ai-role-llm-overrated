@@ -1,7 +1,7 @@
 [project]
-name = "ocr"
+name = "ocr-engine"
 version = "0.1.0"
-description = "Add your description here"
+description = "Vendor-agnostic OCR engine with Amazon Textract support"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -12,3 +12,10 @@ dependencies = [
     "pymupdf>=1.26.6",
     "python-dotenv>=1.2.1",
 ]
+
+[project.scripts]
+ocr-cli = "ocr_engine.cli:process"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

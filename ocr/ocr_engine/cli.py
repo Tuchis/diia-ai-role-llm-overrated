@@ -1,6 +1,6 @@
 import click
 from dotenv import load_dotenv
-from ocr_engine import OCREngine, TextractOCRProvider, visualize_results
+from . import OCREngine, TextractOCRProvider, visualize_results
 
 load_dotenv()
 
