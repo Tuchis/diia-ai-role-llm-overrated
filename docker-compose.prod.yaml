@@ -28,8 +28,6 @@ services:
   frontend:
     build:
       context: ./frontend
-      args:
-        - VITE_API_URL=${VITE_API_URL:-http://98.95.171.9:8000}
     container_name: diia_frontend
     restart: always
     ports:
