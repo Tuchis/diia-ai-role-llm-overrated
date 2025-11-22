@@ -2,7 +2,7 @@ import asyncio
 import os
 import logging
 from typing import Any
-from openai import AsyncAzureOpenAI
+from openai import AsyncAzureOpenAI, AsyncOpenAI
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -12,20 +12,29 @@ AIRUN_ENDPOINT = "https://codemie.lab.epam.com/llms"
 API_VERSION = "2024-02-01"
 DEFAULT_MODEL = "gemini-2.5-flash"
 
+LAPA_ENDPOINT = ""
+
 class TranslationEngine:
     def __init__(self):
         if not AIRUN_API_KEY:
             logger.warning("AIRUN_API_KEY not set. Calls will fail unless set in environment.")
 
-        self.client = AsyncAzureOpenAI(
-            api_key=AIRUN_API_KEY,
-            azure_endpoint=AIRUN_ENDPOINT,
-            api_version=API_VERSION
-        )
+        self.clients = {
+                "common": AsyncAzureOpenAI(
+                    api_key=AIRUN_API_KEY,
+                    azure_endpoint=AIRUN_ENDPOINT,
+                    api_version=API_VERSION
+                ),
+                "lapa": AsyncOpenAI(
+                    base_url=LAPA_ENDPOINT,
+                    api_key=""
+                ),
+        }
 
     async def translate_text(self, text: str, source: str, target: str, model: str) -> str:
+        client = self.clients["common"] if model != "lapa" else self.clients["lapa"]
         try:
-            response = await self.client.chat.completions.create(
+            response = await client.chat.completions.create(
                 model=model,
                 messages=[
                     {
