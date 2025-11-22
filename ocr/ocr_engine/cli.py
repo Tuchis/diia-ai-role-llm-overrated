@@ -1,7 +1,12 @@
+
+import rootutils
+
+path = rootutils.find_root(search_from=__file__, indicator=".project-root")
+
 import click
 from pathlib import Path
 from dotenv import load_dotenv
-from . import OCREngine, TextractOCRProvider, visualize_results
+from ocr_engine import OCREngine, TextractOCRProvider, CloudVisionOCRProvider, visualize_results
 
 load_dotenv()
 
@@ -12,7 +17,19 @@ load_dotenv()
     is_flag=True,
     help="Visualize the results with bounding boxes.",
 )
-def process(uri_or_path, visualize):
+@click.option(
+    "--provider",
+    type=click.Choice(["textract", "google"], case_sensitive=False),
+    default="textract",
+    help="OCR provider to use (default: textract).",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(writable=True, path_type=Path),
+    help="Output JSON to a file instead of stdout.",
+)
+def process(uri_or_path, visualize, provider, output):
     """
     Process a document and perform OCR.
     """
@@ -23,21 +40,28 @@ def process(uri_or_path, visualize):
         uri = uri_or_path
 
     # Configure provider
-    provider = TextractOCRProvider()
-    engine = OCREngine(provider=provider)
+    if provider == "google":
+        ocr_provider = CloudVisionOCRProvider()
+    else:
+        ocr_provider = TextractOCRProvider()
+        
+    engine = OCREngine(provider=ocr_provider)
     
     # Process
-    try:
-        document = engine.process(uri)
-        
-        # Output JSON (excluding image bytes)
-        print(document.model_dump_json(indent=2))
+    document = engine.process(uri)
+    
+    # Output JSON (excluding image bytes)
+    json_output = document.model_dump_json(indent=2)
+    
+    if output:
+        output.write_text(json_output, encoding="utf-8")
+        click.echo(f"Output written to {output}")
+    else:
+        print(json_output)
 
-        if visualize:
-            visualize_results(document)
+    if visualize:
+        visualize_results(document)
 
-    except Exception as e:
-        click.echo(f"Error processing document: {e}", err=True)
 
 if __name__ == "__main__":
     process()

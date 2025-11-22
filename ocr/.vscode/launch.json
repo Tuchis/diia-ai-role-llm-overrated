@@ -1,0 +1,17 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "main",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/ocr_engine/cli.py",
+            "console": "integratedTerminal",
+            "args": ["/data/Projects/hahaton/docs/student_ticket.jpg", "--provider", "google", "--output", "../text-filler/test-google.json"]
+        }
+    ]
+}
