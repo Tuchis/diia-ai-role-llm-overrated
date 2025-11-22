@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from pathlib import Path
 from .models import OCRDocument
 from .text_inpainter import TextInpainter
 
@@ -8,7 +9,7 @@ def _unpack_bbox(bbox: dict[str, float]) -> tuple[float, float, float, float]:
     return bbox["Left"], bbox["Top"], bbox["Width"], bbox["Height"]
 
 
-def visualize_results(document: OCRDocument):
+def visualize_results(document: OCRDocument, output_path: Path):
     painter = TextInpainter.from_document(document)
 
     for page in document.pages:
@@ -47,25 +48,25 @@ def visualize_results(document: OCRDocument):
                 # # Draw rectangle
                 # cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
 
-    for i, page in enumerate(document.pages):
-        image = painter.render_page_to_pixmap(i)
+    # for i, page in enumerate(document.pages):
+    #     image = painter.render_page_to_pixmap(i)
 
-        height, width, _ = image.shape
+    #     height, width, _ = image.shape
 
-        max_im_size = max(width, height)
-        if max_im_size > 1024:
-            scale = 1024 / max_im_size
-            image = cv2.resize(image, (int(width * scale), int(height * scale)), interpolation=cv2.INTER_AREA)
+    #     max_im_size = max(width, height)
+    #     if max_im_size > 1024:
+    #         scale = 1024 / max_im_size
+    #         image = cv2.resize(image, (int(width * scale), int(height * scale)), interpolation=cv2.INTER_AREA)
 
-        window_title = f"OCR Results - Page {i + 1}"
+    #     window_title = f"OCR Results - Page {i + 1}"
 
-        cv2.imshow(window_title, image)
-        print(
-            f"Showing page {i + 1}. Press any key to continue to next page (or exit if last)."
-        )
-        cv2.waitKey(0)
-        cv2.destroyWindow(window_title)
+    #     cv2.imshow(window_title, image)
+    #     print(
+    #         f"Showing page {i + 1}. Press any key to continue to next page (or exit if last)."
+    #     )
+    #     cv2.waitKey(0)
+    #     cv2.destroyWindow(window_title)
+    # cv2.destroyAllWindows()
 
-    painter.save("output.pdf")
+    painter.save(output_path)
 
-    cv2.destroyAllWindows()
