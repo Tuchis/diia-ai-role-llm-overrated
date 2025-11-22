@@ -856,7 +856,7 @@ const DocumentDetailView = ({ doc, onBack }) => {
               </div>
             ) : originalPdfUrl ? (
               <iframe
-                src={originalPdfUrl}
+                src={`${originalPdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
                 className="w-full h-full border-none"
                 title="Original Document PDF"
               />
@@ -895,7 +895,7 @@ const DocumentDetailView = ({ doc, onBack }) => {
                   </div>
                 ) : translatedPdfUrl ? (
                   <iframe
-                    src={translatedPdfUrl}
+                    src={`${translatedPdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
                     className="w-full h-full border-none"
                     title="Translated Document PDF"
                   />
