@@ -258,4 +258,4 @@ def get_user_documents(user=Depends(get_current_user)):
 
     return {"documents": result}
 
-app.include_router(router, prefix="/app")
+app.include_router(router, prefix="/api")
