@@ -149,6 +149,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'processing', 'completed'
 
   // Load documents from backend
   const loadDocuments = async () => {
@@ -394,25 +395,35 @@ export default function App() {
 
           {/* Filter / Status Tabs */}
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
-            {['All Documents', 'Processing', 'Completed'].map((tab, i) => (
+            {[
+              { label: 'All Documents', value: 'all' },
+              { label: 'Processing', value: 'processing' },
+              { label: 'Completed', value: 'completed' }
+            ].map((tab) => (
               <button
-                key={tab}
+                key={tab.value}
+                onClick={() => setFilterStatus(tab.value)}
                 className={`whitespace-nowrap px-6 py-2.5 rounded-full text-sm font-bold transition-colors ${
-                  i === 0 
-                  ? 'bg-black text-white' 
+                  filterStatus === tab.value
+                  ? 'bg-black text-white'
                   : 'bg-white text-gray-500 hover:bg-gray-100 border border-transparent'
                 }`}
               >
-                {tab}
+                {tab.label}
               </button>
             ))}
           </div>
 
           {/* Document Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {documents.map((doc) => (
-              <DocumentCard key={doc.id} doc={doc} onClick={() => handleOpenDoc(doc)} />
-            ))}
+            {documents
+              .filter((doc) => {
+                if (filterStatus === 'all') return true;
+                return doc.status === filterStatus;
+              })
+              .map((doc) => (
+                <DocumentCard key={doc.id} doc={doc} onClick={() => handleOpenDoc(doc)} />
+              ))}
           </div>
         </main>
 
