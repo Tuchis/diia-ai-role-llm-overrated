@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
-import fitz  # pymupdf
+import pymupdf as fitz  # pymupdf
 from urllib.parse import urlparse, unquote
 from pathlib import Path
 
