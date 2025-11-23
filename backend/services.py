@@ -88,7 +88,8 @@ def upload_file_to_s3(user_email: str, filename: str, file_type: str, file_conte
     """
     # Create a unique file path: raw/user@email.com/uuid/filename
     request_id = str(uuid.uuid4())
-    object_name = f"raw/{user_email}/{request_id}/{filename}"
+    end = filename.split('.')[-1]
+    object_name = f"raw/{user_email}/{request_id}/file.{end}"
 
     try:
         s3_client.put_object(
