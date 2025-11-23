@@ -62,5 +62,6 @@ def lambda_handler(event, context):
         "bucket": bucket,
         "raw_key": raw_key,
         "message": "OCR completed",
-        "result": result_translation.json()
+        "result": result_translation.json(),
+        "previous": result
     }
