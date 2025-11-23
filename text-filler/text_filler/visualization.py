@@ -67,7 +67,9 @@ def _nms_filter(
 
 def visualize_results(document: OCRDocument, output_path: Path):
     for page in document.pages:
+        print(f"Before {page.blocks}")
         page.blocks = _nms_filter(page.blocks)
+        print(f"After {page.blocks}")
 
     document = document.copy()
     painter = TextInpainter.from_document(document)

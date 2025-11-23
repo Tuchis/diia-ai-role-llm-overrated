@@ -32,7 +32,7 @@ def lambda_handler(event, context):
     print(f"{message=}")
     _, email, request_id, filename = raw_key.split("/", 3)
 
-    processed_key = f"processed/{email}/{request_id}/{filename}"
+    processed_key = f"processed/{email}/{request_id}/result.pdf"
 
     print(result_json)
 
