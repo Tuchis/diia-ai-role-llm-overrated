@@ -14,12 +14,17 @@ from injection_detector import is_prompt_injected
 
 engine = TranslationEngine()
 
+dynamodb = boto3.resource("dynamodb")
+TABLE_NAME = "diia_hack_requests"
+table = dynamodb.Table(TABLE_NAME)
 
-async def translate_document(request: TranslationRequest):
+async def translate_document(request: TranslationRequest, raw_key):
     """
     Receives a JSON document, recursively translates its content,
     and returns the preserved structure with translated values.
     """
+    _, email, request_id, filename = raw_key.split("/", 3)
+
     logger.info(f"Received translation request: {request.source_lang} -> {request.target_lang} using {request.model}")
 
     try:
@@ -29,12 +34,34 @@ async def translate_document(request: TranslationRequest):
         if is_prompt_injected(concatenated_text):
             #TODO change DynamoDB
              logger.warning("Request blocked by prompt injection check.")
+             response = table.update_item(
+                Key={"request_id": request_id},
+                UpdateExpression="SET #s = :status",
+                ExpressionAttributeNames={
+                    "#s": "status"  # "status" is reserved, must alias
+                },
+                ExpressionAttributeValues={
+                    ":status": "FAILED",
+                },
+                ReturnValues="UPDATED_NEW",
+             )
              raise HTTPException(status_code=400, detail="Content blocked by security policies.")
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Injection check processing error: {str(e)}")
+        response = table.update_item(
+            Key={"request_id": request_id},
+            UpdateExpression="SET #s = :status",
+            ExpressionAttributeNames={
+                "#s": "status"  # "status" is reserved, must alias
+            },
+            ExpressionAttributeValues={
+                ":status": "FAILED",
+            },
+            ReturnValues="UPDATED_NEW",
+        )
         raise HTTPException(status_code=500, detail=f"Security check processing error: {str(e)}")
 
     try:
@@ -56,6 +83,17 @@ async def translate_document(request: TranslationRequest):
 
     except Exception as e:
         logger.error(f"Translation failed: {str(e)}")
+        response = table.update_item(
+            Key={"request_id": request_id},
+            UpdateExpression="SET #s = :status",
+            ExpressionAttributeNames={
+                "#s": "status"  # "status" is reserved, must alias
+            },
+            ExpressionAttributeValues={
+                ":status": "FAILED",
+            },
+            ReturnValues="UPDATED_NEW",
+        )
         raise HTTPException(status_code=500, detail="Internal translation processing error")
 
 async def get_languages():

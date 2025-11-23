@@ -39,7 +39,7 @@ def lambda_handler(event, context):
         )
 
         # Process
-        result_translation = asyncio.run(translate_document(document))
+        result_translation = asyncio.run(translate_document(document, raw_key))
     except Exception as ex:
         response = table.update_item(
             Key={"request_id": request_id},
