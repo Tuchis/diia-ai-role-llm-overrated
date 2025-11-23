@@ -1,15 +1,62 @@
 import cv2
 import numpy as np
 from pathlib import Path
-from .models import OCRDocument
+from .models import OCRDocument, OCRBlock
 from .text_inpainter import TextInpainter
 
 
 def _unpack_bbox(bbox: dict[str, float]) -> tuple[float, float, float, float]:
     return bbox["Left"], bbox["Top"], bbox["Width"], bbox["Height"]
 
+def _iou(bbox1: tuple[float, float, float, float], bbox2: tuple[float, float, float, float]) -> float:
+    x1, y1, w1, h1 = bbox1
+    x2, y2, w2, h2 = bbox2
+    
+    intersection = max(0, min(x1 + w1, x2 + w2) - max(x1, x2)) * max(0, min(y1 + h1, y2 + h2) - max(y1, y2))
+    union = w1 * h1 + w2 * h2 - intersection + 1e-6
+    return intersection / union
+
+def _nms_filter(blocks: list[OCRBlock], min_confidence: float = 0.8, max_iou: float = 0.35, max_aspect_discrepancy: float = 3) -> list[OCRBlock]:
+    block_idx_by_confidence = list(range(len(blocks)))
+    block_idx_by_confidence.sort(key=lambda i: blocks[i].confidence, reverse=True)
+    bboxes = [_unpack_bbox(block.geometry["BoundingBox"]) for block in blocks]
+    dropped_idxs = set()
+
+    for i, bbox in enumerate(bboxes):
+        text_len = len(blocks[i].text)
+        box_w, box_h = bbox[2], bbox[3]
+        bbox_aspect = box_w / box_h
+
+
+        if text_len / bbox_aspect > max_aspect_discrepancy and len(blocks[i].text) < 20:
+            dropped_idxs.add(i)
+        
+    
+    for j, idx in enumerate(block_idx_by_confidence):
+        if idx in dropped_idxs:
+            continue
+        
+        for other_idx in block_idx_by_confidence[j + 1:]:
+            if other_idx in dropped_idxs:
+                continue
+
+            if blocks[other_idx].confidence < min_confidence:
+                dropped_idxs.add(other_idx)
+                continue
+            
+            iou = _iou(bboxes[idx], bboxes[other_idx])
+            if iou > max_iou:
+                dropped_idxs.add(idx)
+                dropped_idxs.add(other_idx)
+    
+    return [blocks[i] for i in block_idx_by_confidence if i not in dropped_idxs]
+
 
 def visualize_results(document: OCRDocument, output_path: Path):
+    for page in document.pages:
+        page.blocks = _nms_filter(page.blocks)
+
+    document = document.copy()
     painter = TextInpainter.from_document(document)
 
     for page in document.pages:
@@ -36,37 +83,6 @@ def visualize_results(document: OCRDocument, output_path: Path):
                     align="justify",
                     color=(0, 0, 0),
                 )
-
-                # Color based on confidence
-                # if block.confidence > 0.9:
-                #     color = (0, 255, 0)  # Green
-                # elif block.confidence > 0.5:
-                #     color = (0, 165, 255) # Orange (BGR)
-                # else:
-                #     color = (0, 0, 255)  # Red
-
-                # # Draw rectangle
-                # cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
-
-    # for i, page in enumerate(document.pages):
-    #     image = painter.render_page_to_pixmap(i)
-
-    #     height, width, _ = image.shape
-
-    #     max_im_size = max(width, height)
-    #     if max_im_size > 1024:
-    #         scale = 1024 / max_im_size
-    #         image = cv2.resize(image, (int(width * scale), int(height * scale)), interpolation=cv2.INTER_AREA)
-
-    #     window_title = f"OCR Results - Page {i + 1}"
-
-    #     cv2.imshow(window_title, image)
-    #     print(
-    #         f"Showing page {i + 1}. Press any key to continue to next page (or exit if last)."
-    #     )
-    #     cv2.waitKey(0)
-    #     cv2.destroyWindow(window_title)
-    # cv2.destroyAllWindows()
 
     painter.save(output_path)
 

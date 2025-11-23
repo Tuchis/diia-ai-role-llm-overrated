@@ -155,9 +155,15 @@ class BackgroundInpainterV2:
         block_image_gray = cv2.cvtColor(block_image, cv2.COLOR_BGR2GRAY)
 
         otsu_threshold, inpaint_mask = cv2.threshold(block_image_gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-        inpaint_mask = cv2.morphologyEx(inpaint_mask, cv2.MORPH_DILATE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)))
+        hline_detection_kernel_size = w // 2 + 1
+        hline_mask = cv2.morphologyEx(inpaint_mask, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (hline_detection_kernel_size, 1)))
+
+        inpaint_mask = cv2.bitwise_xor(inpaint_mask, hline_mask)
+        inpaint_mask = cv2.morphologyEx(inpaint_mask, cv2.MORPH_DILATE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+        inpaint_mask = cv2.bitwise_and(inpaint_mask, cv2.bitwise_not(hline_mask))
 
         page_inpaint_mask[y:y+h, x:x+w] = inpaint_mask
+
 
 class BackgroundInpainterV3:
     """

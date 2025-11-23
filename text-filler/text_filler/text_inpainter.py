@@ -13,12 +13,17 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
-from .background_inpainter import DummyInpainter, BackgroundInpainterV1, BackgroundInpainterV2, BackgroundInpainterV3
+from .background_inpainter import (
+    DummyInpainter,
+    BackgroundInpainterV1,
+    BackgroundInpainterV2,
+    BackgroundInpainterV3,
+)
 
 
 # Register the font once
 try:
-    pdfmetrics.registerFont(TTFont('Times-New-Roman', 'times.ttf'))
+    pdfmetrics.registerFont(TTFont("Times-New-Roman", "times.ttf"))
 except Exception as e:
     print(f"Warning: Could not register font: {e}")
 
@@ -97,8 +102,6 @@ class TextInpainter:
             }
         )
 
-    
-
     def _flush_text_ops(self, page_index: int) -> None:
         if page_index not in self.text_ops or not self.text_ops[page_index]:
             return
@@ -154,7 +157,18 @@ class TextInpainter:
         # Flush all pending operations before saving
         for page_index in list(self.text_ops.keys()):
             self._flush_text_ops(page_index)
-        self.fitz_document.save(out_path)
+        self.fitz_document.subset_fonts()
+        self.fitz_document.rewrite_images(
+            dpi_threshold=160,
+            dpi_target=96,
+            quality=80,
+            lossy=True,
+            lossless=True,
+            bitonal=True,
+            color=True,
+            gray=True,
+        )
+        self.fitz_document.ez_save(out_path)
 
     def close(self) -> None:
         self.fitz_document.close()

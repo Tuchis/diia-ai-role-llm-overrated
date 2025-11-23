@@ -1,4 +1,3 @@
-
 import rootutils
 
 path = rootutils.find_root(search_from=__file__, indicator=".project-root")
@@ -10,7 +9,8 @@ from ocr_engine import OCREngine, TextractOCRProvider, CloudVisionOCRProvider, v
 
 load_dotenv()
 
-def process(uri_or_path, visualize, provider, output):
+
+def process(uri_or_path, visualize, provider, output, debug=False):
     """
     Process a document and perform OCR.
     """
@@ -29,19 +29,21 @@ def process(uri_or_path, visualize, provider, output):
         ocr_provider = TextractOCRProvider()
 
     engine = OCREngine(provider=ocr_provider)
-    
+
     # Process
     document = engine.process(uri)
 
     json_output = document.model_dump_json(indent=2)
 
-    return json_output
+    if not debug:
+        return json_output
 
     # Output JSON (excluding image bytes)
     json_output = document.model_dump_json(indent=2)
-    
+
     if output:
-        output.write_text(json_output, encoding="utf-8")
+        with open(output, "w") as f:
+            f.write(json_output)
         click.echo(f"Output written to {output}")
     else:
         print(json_output)
@@ -50,5 +52,20 @@ def process(uri_or_path, visualize, provider, output):
         visualize_results(document)
 
 
+@click.command()
+@click.argument(
+    "uri_or_path", required=True, type=click.Path(exists=True)
+)
+@click.option("--visualize", is_flag=True, help="Visualize results")
+@click.option(
+    "--provider", default="textract", help="OCR provider (textract or google)"
+)
+@click.option(
+    "--output", type=click.Path(path_type=Path), help="Output file for JSON results"
+)
+def main(uri_or_path, visualize, provider, output):
+    process(uri_or_path, visualize, provider, output, debug=True)
+
+
 if __name__ == "__main__":
-    process()
+    main()

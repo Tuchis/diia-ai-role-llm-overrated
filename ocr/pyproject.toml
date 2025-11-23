@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-ocr-cli = "ocr_engine.cli:process"
+ocr-cli = "ocr_engine.cli:main"
 
 [build-system]
 requires = ["hatchling"]
