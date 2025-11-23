@@ -1,17 +1,17 @@
-aws ecr create-repository --repository-name translation --region us-east-1 --image-scanning-configuration scanOnPush=true --image-tag-mutability MUTABLE
+aws ecr create-repository --repository-name filler --region us-east-1 --image-scanning-configuration scanOnPush=true --image-tag-mutability MUTABLE
 
-docker buildx build --build-arg AIRUN_API_KEY=$AIRUN_API_KEY --platform linux/amd64 --no-cache  --provenance=false -t translation:test .
+docker buildx build --platform linux/amd64 --no-cache  --provenance=false -t filler:test .
 
-docker tag translation:test 211357186042.dkr.ecr.us-east-1.amazonaws.com/translation:latest
+docker tag filler:test 211357186042.dkr.ecr.us-east-1.amazonaws.com/filler:latest
 
-docker push 211357186042.dkr.ecr.us-east-1.amazonaws.com/translation:latest
+docker push 211357186042.dkr.ecr.us-east-1.amazonaws.com/filler:latest
 
-aws lambda delete-function --function-name lambda-translation
+aws lambda delete-function --function-name lambda-filler
 
 aws lambda create-function \
-  --function-name lambda-translation \
+  --function-name lambda-filler \
   --package-type Image \
-  --code ImageUri=211357186042.dkr.ecr.us-east-1.amazonaws.com/translation:latest \
+  --code ImageUri=211357186042.dkr.ecr.us-east-1.amazonaws.com/filler:latest \
   --role arn:aws:iam::211357186042:role/service-role/lambda-role-executor \
   --timeout 300 \
   --memory-size 512

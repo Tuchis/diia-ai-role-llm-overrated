@@ -3,7 +3,11 @@ import numpy as np
 from pathlib import Path
 from .models import OCRDocument, OCRBlock
 from .text_inpainter import TextInpainter
+import boto3
+import tempfile
 
+s3 = boto3.client('s3')
+bucket = "diia-translation-bucket"
 
 def _unpack_bbox(bbox: dict[str, float]) -> tuple[float, float, float, float]:
     return bbox["Left"], bbox["Top"], bbox["Width"], bbox["Height"]
@@ -89,4 +93,11 @@ def visualize_results(document: OCRDocument, output_path: Path):
                     (x, y, x + w, y + h),
                 )
 
-    painter.save(output_path)
+    print("Saving image...")
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        painter.save(f"{tmpdirname}/result.pdf")
+        print(f"{output_path=}")
+        with open(f"{tmpdirname}/result.pdf", "rb") as f:
+            s3.put_object(Bucket=bucket, Key=output_path, Body=f.read())
+
+

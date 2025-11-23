@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
-import fitz  # pymupdf
+import pymupdf as fitz  # pymupdf
 from urllib.parse import urlparse, unquote
 from pathlib import Path
 
@@ -55,7 +55,10 @@ class OCRDocument(BaseModel):
         elif parsed.scheme == "s3":
             import boto3
 
+            print(parsed)
+
             s3 = boto3.client("s3")
+
             bucket = parsed.netloc
             key = parsed.path.lstrip("/")
             response = s3.get_object(Bucket=bucket, Key=key)
@@ -116,5 +119,7 @@ class OCRDocument(BaseModel):
         Deserializes an OCRDocument from a JSON string.
         """
         doc = cls.model_validate_json(json_str)
+        print(f"{json_str=}")
+        print(f"{doc=}")
         doc._load_page_images()
         return doc
