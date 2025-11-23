@@ -24,8 +24,11 @@ from .background_inpainter import (
 # Register the font once
 try:
     pdfmetrics.registerFont(TTFont("Times-New-Roman", "times.ttf"))
+    pdfmetrics.registerFont(TTFont("Arial", "arial.ttf"))
 except Exception as e:
     print(f"Warning: Could not register font: {e}")
+
+FONT = "Arial"
 
 Align = Literal["left", "right", "center", "justify"]
 
@@ -84,12 +87,7 @@ class TextInpainter:
         page_index: int,
         text: str,
         norm_rect: Tuple[float, float, float, float],
-        font_size: float = 12.0,
-        font_name: str = "Times-Roman",
-        align: Align = "justify",
-        color: Tuple[float, float, float] = (0, 0, 0),
-        overlay: bool = True,
-        encoding: Optional[str] = "utf8",
+        align: Align = "center",
     ) -> None:
         if page_index not in self.text_ops:
             self.text_ops[page_index] = []
@@ -101,6 +99,48 @@ class TextInpainter:
                 "align": align,
             }
         )
+
+    @staticmethod
+    def _estimate_font_parameters(
+        text: str, width: float, height: float, font_name: str
+    ) -> Tuple[float, str]:
+        max_ratio = 0.98
+        min_ratio = 0.86
+        font_size = height * 0.2
+        current_text = text
+
+        max_iterations = 1000
+        iteration = 0
+
+        words = text.split()
+        space_count = 1
+
+        while iteration < max_iterations:
+            text_width = stringWidth(current_text, font_name, font_size)
+
+            if text_width > width * max_ratio:
+                if space_count > 1 and len(words) > 1:
+                    space_count -= 1
+                    current_text = (" " * space_count).join(words)
+                elif font_size > height * 0.2:
+                    font_size -= 0.05 * height
+                break
+
+            if text_width > width * min_ratio:
+                break
+
+            if font_size > 1.1 * height:
+                if len(words) <= 1:
+                    break
+
+                space_count += 1
+                current_text = (" " * space_count).join(words)
+            else:
+                font_size += 0.05 * height
+
+            iteration += 1
+
+        return font_size, current_text
 
     def _flush_text_ops(self, page_index: int) -> None:
         if page_index not in self.text_ops or not self.text_ops[page_index]:
@@ -133,14 +173,22 @@ class TextInpainter:
             # c.rect(rl_x, rl_y, rl_width, rl_height, fill=1, stroke=0)
             # c.restoreState()
 
-            style.alignment = TA_JUSTIFY
-            style.fontSize = rl_height * 0.75
-            style.fontName = "Times-New-Roman"
+            # Font estimation algorithm
+            font_size, final_text = self._estimate_font_parameters(
+                op["text"], rl_width, rl_height, FONT
+            )
 
-            p = Paragraph(op["text"] + "\n\n", style)
+            style.alignment = self._align_to_reportlab(op["align"])
+            style.fontSize = font_size
+            style.fontName = FONT
+            # Leading is the spacing between lines. Set it slightly larger than font size.
+            style.leading = font_size * 1.2
+
+            p = Paragraph(final_text, style)
             w, h = p.wrap(rl_width, rl_height)
 
-            draw_y = rl_y + rl_height - h
+            # Center vertically
+            draw_y = rl_y + (rl_height - h) / 2
             p.drawOn(c, rl_x, draw_y)
 
         c.save()

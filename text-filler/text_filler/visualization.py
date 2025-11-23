@@ -8,15 +8,26 @@ from .text_inpainter import TextInpainter
 def _unpack_bbox(bbox: dict[str, float]) -> tuple[float, float, float, float]:
     return bbox["Left"], bbox["Top"], bbox["Width"], bbox["Height"]
 
-def _iou(bbox1: tuple[float, float, float, float], bbox2: tuple[float, float, float, float]) -> float:
+
+def _iou(
+    bbox1: tuple[float, float, float, float], bbox2: tuple[float, float, float, float]
+) -> float:
     x1, y1, w1, h1 = bbox1
     x2, y2, w2, h2 = bbox2
-    
-    intersection = max(0, min(x1 + w1, x2 + w2) - max(x1, x2)) * max(0, min(y1 + h1, y2 + h2) - max(y1, y2))
+
+    intersection = max(0, min(x1 + w1, x2 + w2) - max(x1, x2)) * max(
+        0, min(y1 + h1, y2 + h2) - max(y1, y2)
+    )
     union = w1 * h1 + w2 * h2 - intersection + 1e-6
     return intersection / union
 
-def _nms_filter(blocks: list[OCRBlock], min_confidence: float = 0.8, max_iou: float = 0.35, max_aspect_discrepancy: float = 3) -> list[OCRBlock]:
+
+def _nms_filter(
+    blocks: list[OCRBlock],
+    min_confidence: float = 0.8,
+    max_iou: float = 0.35,
+    max_aspect_discrepancy: float = 3,
+) -> list[OCRBlock]:
     block_idx_by_confidence = list(range(len(blocks)))
     block_idx_by_confidence.sort(key=lambda i: blocks[i].confidence, reverse=True)
     bboxes = [_unpack_bbox(block.geometry["BoundingBox"]) for block in blocks]
@@ -27,28 +38,26 @@ def _nms_filter(blocks: list[OCRBlock], min_confidence: float = 0.8, max_iou: fl
         box_w, box_h = bbox[2], bbox[3]
         bbox_aspect = box_w / box_h
 
-
         if text_len / bbox_aspect > max_aspect_discrepancy and len(blocks[i].text) < 20:
             dropped_idxs.add(i)
-        
-    
+
     for j, idx in enumerate(block_idx_by_confidence):
         if idx in dropped_idxs:
             continue
-        
-        for other_idx in block_idx_by_confidence[j + 1:]:
+
+        for other_idx in block_idx_by_confidence[j + 1 :]:
             if other_idx in dropped_idxs:
                 continue
 
             if blocks[other_idx].confidence < min_confidence:
                 dropped_idxs.add(other_idx)
                 continue
-            
+
             iou = _iou(bboxes[idx], bboxes[other_idx])
             if iou > max_iou:
                 dropped_idxs.add(idx)
                 dropped_idxs.add(other_idx)
-    
+
     return [blocks[i] for i in block_idx_by_confidence if i not in dropped_idxs]
 
 
@@ -78,11 +87,6 @@ def visualize_results(document: OCRDocument, output_path: Path):
                     page.page_number - 1,
                     block.text,
                     (x, y, x + w, y + h),
-                    font_size=12,
-                    font_name="Times-Roman",
-                    align="justify",
-                    color=(0, 0, 0),
                 )
 
     painter.save(output_path)
-
