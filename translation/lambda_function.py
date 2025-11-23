@@ -1,4 +1,6 @@
 import sys
+from http.client import HTTPException
+
 from server import translate_document
 from data_models import TranslationRequest
 import json
@@ -52,6 +54,7 @@ def lambda_handler(event, context):
             },
             ReturnValues="UPDATED_NEW",
         )
+        raise HTTPException(status_code=500, detail=str(ex))
 
     print(result_translation)
 

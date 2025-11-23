@@ -11,6 +11,7 @@ from data_models import TranslationResponse, TranslationRequest
 from engine import TranslationEngine, AIRUN_ENDPOINT
 from helper import extract_all_text
 from injection_detector import is_prompt_injected
+import boto3
 
 engine = TranslationEngine()
 
@@ -33,8 +34,8 @@ async def translate_document(request: TranslationRequest, raw_key):
 
         if is_prompt_injected(concatenated_text):
             #TODO change DynamoDB
-             logger.warning("Request blocked by prompt injection check.")
-             response = table.update_item(
+            logger.warning("Request blocked by prompt injection check.")
+            response = table.update_item(
                 Key={"request_id": request_id},
                 UpdateExpression="SET #s = :status",
                 ExpressionAttributeNames={
@@ -44,8 +45,9 @@ async def translate_document(request: TranslationRequest, raw_key):
                     ":status": "FAILED",
                 },
                 ReturnValues="UPDATED_NEW",
-             )
-             raise HTTPException(status_code=400, detail="Content blocked by security policies.")
+            )
+            print(response)
+            raise HTTPException(status_code=400, detail="Content blocked by security policies.")
 
     except HTTPException:
         raise
