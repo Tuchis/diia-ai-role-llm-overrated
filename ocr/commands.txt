@@ -1,0 +1,17 @@
+
+
+docker buildx build --platform linux/amd64 --no-cache  --provenance=false -t ocr:test .
+
+docker tag ocr:test 211357186042.dkr.ecr.us-east-1.amazonaws.com/ocr:latest
+
+docker push 211357186042.dkr.ecr.us-east-1.amazonaws.com/ocr:latest
+
+aws lambda delete-function --function-name lambda-ocr
+
+aws lambda create-function \
+  --function-name lambda-ocr \
+  --package-type Image \
+  --code ImageUri=211357186042.dkr.ecr.us-east-1.amazonaws.com/ocr:latest \
+  --role arn:aws:iam::211357186042:role/service-role/lambda-role-executor \
+  --timeout 300 \
+  --memory-size 512

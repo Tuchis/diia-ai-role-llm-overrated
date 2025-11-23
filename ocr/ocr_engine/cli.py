@@ -10,25 +10,6 @@ from ocr_engine import OCREngine, TextractOCRProvider, CloudVisionOCRProvider, v
 
 load_dotenv()
 
-@click.command()
-@click.argument("uri_or_path")
-@click.option(
-    "--visualize",
-    is_flag=True,
-    help="Visualize the results with bounding boxes.",
-)
-@click.option(
-    "--provider",
-    type=click.Choice(["textract", "google"], case_sensitive=False),
-    default="textract",
-    help="OCR provider to use (default: textract).",
-)
-@click.option(
-    "--output",
-    "-o",
-    type=click.Path(writable=True, path_type=Path),
-    help="Output JSON to a file instead of stdout.",
-)
 def process(uri_or_path, visualize, provider, output):
     """
     Process a document and perform OCR.
@@ -39,17 +20,23 @@ def process(uri_or_path, visualize, provider, output):
     else:
         uri = uri_or_path
 
+    print(uri)
+
     # Configure provider
     if provider == "google":
         ocr_provider = CloudVisionOCRProvider()
     else:
         ocr_provider = TextractOCRProvider()
-        
+
     engine = OCREngine(provider=ocr_provider)
     
     # Process
     document = engine.process(uri)
-    
+
+    json_output = document.model_dump_json(indent=2)
+
+    return json_output
+
     # Output JSON (excluding image bytes)
     json_output = document.model_dump_json(indent=2)
     
