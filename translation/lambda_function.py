@@ -3,9 +3,17 @@ from server import translate_document
 from data_models import TranslationRequest
 import json
 import urllib.parse
-import boto3
 
 import asyncio
+
+
+import boto3
+
+
+dynamodb = boto3.resource("dynamodb")
+TABLE_NAME = "diia_hack_requests"
+table = dynamodb.Table(TABLE_NAME)
+
 
 def lambda_handler(event, context):
     print(f"\n===Lambda for Translation===\n")
@@ -17,18 +25,33 @@ def lambda_handler(event, context):
     result_json = json.loads(result)
     incoming_message = event.get("message", "")
 
+    _, email, request_id, filename = raw_key.split("/", 3)
+
     # print(f"OCR Reulst {result}")
 
     print(f"Incoming message: {incoming_message}")
 
-    document = TranslationRequest(
-        source_lang='uk',
-        target_lang='en',
-        content=result_json,
-    )
+    try:
+        document = TranslationRequest(
+            source_lang='uk',
+            target_lang='en',
+            content=result_json,
+        )
 
-    # Process
-    result_translation = asyncio.run(translate_document(document))
+        # Process
+        result_translation = asyncio.run(translate_document(document))
+    except Exception as ex:
+        response = table.update_item(
+            Key={"request_id": request_id},
+            UpdateExpression="SET #s = :status",
+            ExpressionAttributeNames={
+                "#s": "status"  # "status" is reserved, must alias
+            },
+            ExpressionAttributeValues={
+                ":status": "FAILED",
+            },
+            ReturnValues="UPDATED_NEW",
+        )
 
     print(result_translation)
 
