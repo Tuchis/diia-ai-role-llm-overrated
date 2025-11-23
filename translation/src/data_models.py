@@ -22,3 +22,4 @@ class TranslationResponse(BaseModel):
     source_lang: str
     target_lang: str
     translated_content: dict[str, Any]
+    initial_content: dict[str, Any]

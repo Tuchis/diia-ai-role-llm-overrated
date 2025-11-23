@@ -19,3 +19,6 @@ tqdm==4.67.1
 typing-extensions==4.15.0
 typing-inspection==0.4.2
 uvicorn==0.38.0
+sagemaker==2.251.1
+dotenv
+asyncio

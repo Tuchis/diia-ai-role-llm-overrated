@@ -14,17 +14,7 @@ from injection_detector import is_prompt_injected
 
 engine = TranslationEngine()
 
-app = FastAPI(
-    title="Translation Microservice",
-    description="A microservice that accepts structured JSON and translates string values.",
-    version="1.0.0"
-)
 
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy", "service": "translation-service", "model_endpoint": AIRUN_ENDPOINT}
-
-@app.post("/translate", response_model=TranslationResponse)
 async def translate_document(request: TranslationRequest):
     """
     Receives a JSON document, recursively translates its content,
@@ -37,6 +27,7 @@ async def translate_document(request: TranslationRequest):
         concatenated_text = " ".join(all_text_list)
 
         if is_prompt_injected(concatenated_text):
+            #TODO change DynamoDB
              logger.warning("Request blocked by prompt injection check.")
              raise HTTPException(status_code=400, detail="Content blocked by security policies.")
 
@@ -59,14 +50,14 @@ async def translate_document(request: TranslationRequest):
             job_id=f"job_{str(uuid.uuid4())}",
             source_lang=request.source_lang,
             target_lang=request.target_lang,
-            translated_content=translated_data
+            translated_content=translated_data,
+            initial_content=request.content
         )
 
     except Exception as e:
         logger.error(f"Translation failed: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal translation processing error")
 
-@app.get("/supported_languages")
 async def get_languages():
     return {
         "uk": "Ukrainian",
@@ -75,9 +66,4 @@ async def get_languages():
         "pl": "Polish",
         "es": "Spanish"
     }
-
-
-if __name__ == "__main__":
-    print("Starting Translation Microservice on http://localhost:7777")
-    uvicorn.run(app, host="0.0.0.0", port=7777)
 

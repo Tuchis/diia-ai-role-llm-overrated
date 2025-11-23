@@ -20,10 +20,11 @@ def lambda_handler(event, context):
     print(f"Incoming message: {incoming_message}")
 
     # Process
-    process(uri, False, 'textract', incoming_message)
+    result = process(uri, False, 'textract', incoming_message)
 
     return {
         "bucket": bucket,
         "raw_key": raw_key,
-        "message": "OCR completed"
+        "message": "OCR completed",
+        "result": result,
     }

@@ -17,6 +17,12 @@ DEFAULT_MODEL = "gemini-2.5-flash"
 
 LAPA_ENDPOINT = ""
 
+UKRAINIAN_LETTERS = 'абвгґдеєжзиіїйклмнопрстуфхцчшщьюя'
+
+def has_ukrainian_letter(text: str) -> bool:
+    text = text.lower()
+    return any(ch in UKRAINIAN_LETTERS for ch in text)
+
 class TranslationEngine:
     def __init__(self):
         if not AIRUN_API_KEY:
@@ -78,6 +84,7 @@ class TranslationEngine:
                 response_format={"type": "json_object"}
             )
 
+            print(f"Content top: {response.choices[0].message.content}")
             content = response.choices[0].message.content.strip()
             if content.startswith("```json"):
                 content = content[7:-3]
@@ -96,7 +103,7 @@ class TranslationEngine:
         text_to_translate = text
         client = self.clients["common"] if model != "lapa" else self.clients["lapa"]
 
-        if use_ner and source == 'uk':
+        if use_ner and source == 'uk' and has_ukrainian_letter(text_to_translate):
             entities = await self._extract_entities_llm(text, model)
 
             if entities:
@@ -124,7 +131,8 @@ class TranslationEngine:
                 system_prompt += " The text contains Python format placeholders '{}'. PRESERVE them exactly as they are in the translated output. Do not change their order or count."
 
             translated_text = "{}"
-            if len(text_to_translate.replace("{}", "").strip()) > 0:
+            print(f"{text_to_translate}")
+            if len(text_to_translate.replace("{}", "").strip()) > 0 and has_ukrainian_letter(text_to_translate):
                 logger.info(f"Translating text: {text_to_translate}")
                 response = await client.chat.completions.create(
                     model=model,
@@ -133,7 +141,13 @@ class TranslationEngine:
                         {"role": "user", "content": text_to_translate}
                     ]
                 )
-                translated_text = response.choices[0].message.content.strip()
+                print(f"Content: {response.choices[0].message.content}")
+                if response.choices[0].message.content is None:
+                    translated_text = text_to_translate
+                else:
+                    translated_text = response.choices[0].message.content.strip()
+            else:
+                translated_text = text_to_translate
 
             if transliterated_values:
                 placeholder_count = translated_text.count("{}")
