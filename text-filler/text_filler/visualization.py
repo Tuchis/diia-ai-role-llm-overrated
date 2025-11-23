@@ -37,13 +37,13 @@ def _nms_filter(
     bboxes = [_unpack_bbox(block.geometry["BoundingBox"]) for block in blocks]
     dropped_idxs = set()
 
-    for i, bbox in enumerate(bboxes):
-        text_len = len(blocks[i].text)
-        box_w, box_h = bbox[2], bbox[3]
-        bbox_aspect = box_w / box_h
+    # for i, bbox in enumerate(bboxes):
+    #     text_len = len(blocks[i].text)
+    #     box_w, box_h = bbox[2], bbox[3]
+    #     bbox_aspect = box_w / box_h
 
-        if text_len / bbox_aspect > max_aspect_discrepancy and len(blocks[i].text) < 20:
-            dropped_idxs.add(i)
+    #     if text_len / bbox_aspect > max_aspect_discrepancy and len(blocks[i].text) < 20:
+    #         dropped_idxs.add(i)
 
     for j, idx in enumerate(block_idx_by_confidence):
         if idx in dropped_idxs:
@@ -97,9 +97,10 @@ def visualize_results(document: OCRDocument, output_path: Path):
 
     print("Saving image...")
     with tempfile.TemporaryDirectory() as tmpdirname:
-        painter.save(f"{tmpdirname}/result.pdf")
-        print(f"{output_path=}")
-        with open(f"{tmpdirname}/result.pdf", "rb") as f:
-            s3.put_object(Bucket=bucket, Key=output_path, Body=f.read())
+        painter.save(output_path)
+        # painter.save(f"{tmpdirname}/result.pdf")
+        # print(f"{output_path=}")
+        # with open(f"{tmpdirname}/result.pdf", "rb") as f:
+        #     s3.put_object(Bucket=bucket, Key=output_path, Body=f.read())
 
 
