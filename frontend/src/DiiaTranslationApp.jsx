@@ -934,10 +934,26 @@ const UploadView = ({ onBack, onComplete }) => {
 */
 const DocumentDetailView = ({ doc, onBack }) => {
   const [viewMode, setViewMode] = useState('split'); // 'split', 'original', 'translated'
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
   const [originalPdfUrl, setOriginalPdfUrl] = useState(null);
   const [translatedPdfUrl, setTranslatedPdfUrl] = useState(null);
   const [loadingPdfs, setLoadingPdfs] = useState(true);
+
+  // Observe window width changes
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    // Call once to set initial value
+    handleResize();
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   // Fetch PDFs with authentication and create blob URLs
   useEffect(() => {
