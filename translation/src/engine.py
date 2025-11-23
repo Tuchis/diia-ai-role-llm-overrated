@@ -5,12 +5,16 @@ import re
 import json
 from typing import Any
 from openai import AsyncAzureOpenAI, AsyncOpenAI
+from huggingface_hub import InferenceClient
 from transliteration import transliteration
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 AIRUN_API_KEY = os.getenv("AIRUN_API_KEY")
+MODEL_ENDPOINT = os.getenv("MODEL_ENDPOINT")
+TOKEN = os.getenv("TOKEN")
+
 AIRUN_ENDPOINT = "https://codemie.lab.epam.com/llms"
 API_VERSION = "2024-02-01"
 DEFAULT_MODEL = "gemini-2.5-flash"
@@ -34,10 +38,8 @@ class TranslationEngine:
                     azure_endpoint=AIRUN_ENDPOINT,
                     api_version=API_VERSION
                 ),
-                "lapa": AsyncOpenAI(
-                    base_url=LAPA_ENDPOINT,
-                    api_key=""
-                ),
+                "lapa": InferenceClient(model=MODEL_ENDPOINT,
+                         token=TOKEN),
         }
 
     async def process_document(self, data: Any, source: str, target: str, model: str, ignore_keys: list[str]) -> Any:

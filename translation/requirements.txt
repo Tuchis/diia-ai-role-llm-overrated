@@ -23,3 +23,4 @@ sagemaker==2.251.1
 dotenv
 asyncio
 boto3
+huggingface_hub

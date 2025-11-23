@@ -56,7 +56,8 @@ def lambda_handler(event, context):
         )
         raise HTTPException(status_code=500, detail=str(ex))
 
-    print(result_translation)
+    print(f"{result_translation}")
+    print(f"{result}")
 
     return {
         "bucket": bucket,

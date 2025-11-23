@@ -15,7 +15,7 @@ class TranslationRequest(BaseModel):
         description="Arbitrary JSON content. The service will recurse through this and translate string values."
     )
     ignore_keys: list[str] = Field(default=["id", "uid", "url", "email"], description="JSON keys to skip translation for.")
-    model: str = Field(default=DEFAULT_MODEL, example="gemini-2.5-flash", description="LLM Model to use")
+    model: str = Field(default=DEFAULT_MODEL, example="lapa", description="LLM Model to use")
 
 class TranslationResponse(BaseModel):
     job_id: str
