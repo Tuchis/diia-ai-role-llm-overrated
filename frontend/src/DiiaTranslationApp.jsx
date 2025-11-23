@@ -832,19 +832,38 @@ const UploadView = ({ onBack, onComplete }) => {
             <div className="w-full space-y-6">
               <h2 className="text-2xl font-bold text-center">Choose Target Language</h2>
               <div className="space-y-3">
-                {LANGUAGES.map((lang) => (
-                  <button
-                    key={lang.code}
-                    onClick={() => { setSelectedLang(lang); setStep(3); }}
-                    className="w-full p-4 rounded-2xl bg-[#F5F5F7] hover:bg-black/5 flex items-center justify-between group transition-all"
-                  >
-                    <div className="flex items-center gap-4">
-                      <span className="text-2xl">{lang.flag}</span>
-                      <span className="font-bold text-lg">{lang.name}</span>
-                    </div>
-                    <div className="w-6 h-6 rounded-full border-2 border-gray-300 group-hover:border-black" />
-                  </button>
-                ))}
+                {LANGUAGES.map((lang) => {
+                  const isEnglish = lang.code === 'en';
+                  const isDisabled = !isEnglish;
+
+                  return (
+                    <button
+                      key={lang.code}
+                      onClick={() => {
+                        if (isEnglish) {
+                          setSelectedLang(lang);
+                          setStep(3);
+                        }
+                      }}
+                      disabled={isDisabled}
+                      className={`w-full p-4 rounded-2xl flex items-center justify-between group transition-all ${
+                        isDisabled
+                          ? 'bg-gray-100 opacity-50 cursor-not-allowed'
+                          : 'bg-[#F5F5F7] hover:bg-black/5 cursor-pointer'
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <span className="text-2xl">{lang.flag}</span>
+                        <span className={`font-bold text-lg ${isDisabled ? 'text-gray-400' : ''}`}>{lang.name}</span>
+                      </div>
+                      <div className={`w-6 h-6 rounded-full border-2 ${
+                        isDisabled
+                          ? 'border-gray-300'
+                          : 'border-gray-300 group-hover:border-black'
+                      }`} />
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
