@@ -20,7 +20,8 @@ import {
   ScanLine,
   Maximize2,
   Camera,
-  RotateCw
+  RotateCw,
+  XCircle
 } from 'lucide-react';
 
 /* --- MOCK DATA & ASSETS ---
@@ -400,7 +401,8 @@ export default function App() {
             {[
               { label: 'All Documents', value: 'all' },
               { label: 'Processing', value: 'processing' },
-              { label: 'Completed', value: 'completed' }
+              { label: 'Completed', value: 'completed' },
+              { label: 'Failed', value: 'failed' }
             ].map((tab) => (
               <button
                 key={tab.value}
@@ -474,6 +476,36 @@ export default function App() {
 */
 const DocumentCard = ({ doc, onClick }) => {
   const isCompleted = doc.status === 'completed';
+  const isFailed = doc.status === 'failed';
+  const isProcessing = doc.status === 'processing';
+
+  // Determine styling based on status
+  const getStatusStyles = () => {
+    if (isCompleted) {
+      return {
+        bg: 'bg-[#D4F4E4]',
+        text: 'text-[#008F7E]',
+        icon: <FileCheck size={24} />,
+        label: 'Done'
+      };
+    }
+    if (isFailed) {
+      return {
+        bg: 'bg-[#FFE5E5]',
+        text: 'text-[#DC2626]',
+        icon: <XCircle size={24} />,
+        label: 'Failed'
+      };
+    }
+    return {
+      bg: 'bg-[#FFF4CB]',
+      text: 'text-[#B88E00]',
+      icon: <Loader2 size={24} className="animate-spin-slow" />,
+      label: 'Processing'
+    };
+  };
+
+  const statusStyles = getStatusStyles();
 
   return (
     <div
@@ -481,15 +513,11 @@ const DocumentCard = ({ doc, onClick }) => {
       className="group bg-white rounded-[24px] p-5 cursor-pointer border border-transparent hover:border-black/5 hover:shadow-xl hover:shadow-black/5 transition-all duration-300 active:scale-[0.99]"
     >
       <div className="flex justify-between items-start mb-4">
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-          isCompleted ? 'bg-[#D4F4E4] text-[#008F7E]' : 'bg-[#FFF4CB] text-[#B88E00]'
-        }`}>
-          {isCompleted ? <FileCheck size={24} /> : <Loader2 size={24} className={!isCompleted && "animate-spin-slow"} />}
+        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${statusStyles.bg} ${statusStyles.text}`}>
+          {statusStyles.icon}
         </div>
-        <div className={`px-3 py-1 rounded-full text-xs font-bold ${
-          isCompleted ? 'bg-[#D4F4E4] text-[#008F7E]' : 'bg-[#FFF4CB] text-[#B88E00]'
-        }`}>
-          {isCompleted ? 'Done' : 'Processing'}
+        <div className={`px-3 py-1 rounded-full text-xs font-bold ${statusStyles.bg} ${statusStyles.text}`}>
+          {statusStyles.label}
         </div>
       </div>
 
@@ -998,8 +1026,14 @@ const DocumentDetailView = ({ doc, onBack }) => {
           <div>
             <h1 className="font-bold text-lg sm:text-xl leading-none">{doc.title}</h1>
             <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-              <span className={`w-2 h-2 rounded-full ${doc.status === 'completed' ? 'bg-[#00D2BA]' : 'bg-yellow-400'}`} />
-              {doc.status === 'completed' ? 'Signed & Verified' : 'Processing'}
+              <span className={`w-2 h-2 rounded-full ${
+                doc.status === 'completed' ? 'bg-[#00D2BA]' :
+                doc.status === 'failed' ? 'bg-red-500' :
+                'bg-yellow-400'
+              }`} />
+              {doc.status === 'completed' ? 'Signed & Verified' :
+               doc.status === 'failed' ? 'Translation Failed' :
+               'Processing'}
             </div>
           </div>
         </div>
@@ -1101,6 +1135,16 @@ const DocumentDetailView = ({ doc, onBack }) => {
                 )}
               </div>
             </>
+          ) : doc.status === 'failed' ? (
+            <div className="text-center space-y-4 p-8">
+              <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto">
+                <XCircle size={40} className="text-red-500" />
+              </div>
+              <h3 className="font-bold text-xl text-red-600">Translation Failed</h3>
+              <p className="text-gray-500 text-sm max-w-xs mx-auto">
+                An error occurred while processing this document. Please try uploading it again or contact support if the issue persists.
+              </p>
+            </div>
           ) : (
             <div className="text-center space-y-4 p-8">
               <Loader2 size={40} className="animate-spin mx-auto text-gray-400" />
