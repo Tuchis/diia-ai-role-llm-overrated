@@ -1,4 +1,5 @@
 from fnmatch import translate
+import asyncio
 import os
 import logging
 import re
@@ -41,24 +42,43 @@ class TranslationEngine:
                 "lapa": InferenceClient(model=MODEL_ENDPOINT,
                          token=TOKEN),
         }
+        self.semaphore = asyncio.Semaphore(5)
 
-    async def process_document(self, data: Any, source: str, target: str, model: str, ignore_keys: list[str]) -> Any:
+    async def process_document(self, data: Any, source: str, target: str, model: str, ignore_keys: list[str], full_text: str, use_ner: bool = True) -> Any:
         """
         Recursively traverses a JSON object (dict or list) and translates string values.
         """
         if isinstance(data, dict):
-            return {
-                k: (await self.process_document(v, source, target, model, ignore_keys) if k not in ignore_keys else v)
-                for k, v in data.items()
-            }
+            keys_to_process = []
+            tasks = []
+
+            for k, v in data.items():
+                if k not in ignore_keys:
+                    keys_to_process.append(k)
+                    tasks.append(self.process_document(v, source, target, model, ignore_keys, full_text, use_ner))
+
+            if not tasks:
+                return data
+
+            results = await asyncio.gather(*tasks)
+
+            new_data = data.copy()
+            for k, result in zip(keys_to_process, results):
+                new_data[k] = result
+            return new_data
         elif isinstance(data, list):
-            return [await self.process_document(item, source, target, model, ignore_keys) for item in data]
+            if not data:
+                return []
+            tasks = [self.process_document(item, source, target, model, ignore_keys, full_text, use_ner) for item in data]
+            return await asyncio.gather(*tasks)
+
         elif isinstance(data, str):
             if not data.strip() or data.isnumeric():
                 return data
-            return await self.translate_text(data, source, target, model)
+            return await self.translate_text(data, source, target, model, full_text, use_ner)
         else:
             return data
+
 
     def _transliterate_entity(self, text: str) -> str:
         try:
@@ -100,67 +120,70 @@ class TranslationEngine:
             logger.error(f"NER Extraction Error: {str(e)}")
             return []
 
-    async def translate_text(self, text: str, source: str, target: str, model: str, use_ner: bool = True) -> str:
-        transliterated_values = []
-        text_to_translate = text
-        client = self.clients["common"] if model != "lapa" else self.clients["lapa"]
+    async def translate_text(self, text: str, source: str, target: str, model: str, full_text: str, use_ner: bool = True) -> str:
+        async with self.semaphore:
+            transliterated_values = []
+            text_to_translate = text
+            client = self.clients["common"] if model != "lapa" else self.clients["lapa"]
 
-        if use_ner and source == 'uk' and has_ukrainian_letter(text_to_translate):
-            entities = await self._extract_entities_llm(text, model)
+            if use_ner and source == 'uk' and has_ukrainian_letter(text_to_translate):
+                entities = await self._extract_entities_llm(text, model)
 
-            if entities:
-                unique_entities = sorted(list(set(entities)), key=len, reverse=True)
+                if entities:
+                    unique_entities = sorted(list(set(entities)), key=len, reverse=True)
 
-                if unique_entities:
-                    pattern = re.compile("|".join(map(re.escape, unique_entities)))
+                    if unique_entities:
+                        pattern = re.compile("|".join(map(re.escape, unique_entities)))
 
-                    def replace_callback(match):
-                        word = match.group(0)
-                        transliterated_val = self._transliterate_entity(word)
-                        transliterated_values.append(transliterated_val)
-                        return "{}"
+                        def replace_callback(match):
+                            word = match.group(0)
+                            transliterated_val = self._transliterate_entity(word)
+                            transliterated_values.append(transliterated_val)
+                            return "{}"
 
-                    text_to_translate = pattern.sub(replace_callback, text_to_translate)
+                        text_to_translate = pattern.sub(replace_callback, text_to_translate)
 
-        try:
-            system_prompt = (
-                f"You are a professional translator. "
-                f"Translate the following text from {source} to {target}. "
-                f"Return ONLY the translated text without quotes or explanations. "
-            )
-
-            if transliterated_values:
-                system_prompt += " The text contains Python format placeholders '{}'. PRESERVE them exactly as they are in the translated output. Do not change their order or count."
-
-            translated_text = "{}"
-            print(f"{text_to_translate}")
-            if len(text_to_translate.replace("{}", "").strip()) > 0 and has_ukrainian_letter(text_to_translate):
-                logger.info(f"Translating text: {text_to_translate}")
-                response = await client.chat.completions.create(
-                    model=model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": text_to_translate}
-                    ]
+            try:
+                system_prompt = (
+                    f"You are a professional translator.\n"
+                    f"You work with text from this document:\n{full_text}\n"
+                    f"You return ONLY the translated text without quotes or explanations. "
+                    f"Translate the following text from {source} to {target}. "
                 )
-                print(f"Content: {response.choices[0].message.content}")
-                if response.choices[0].message.content is None:
+
+                if transliterated_values:
+                    system_prompt += " The text contains Python format placeholders '{}'. PRESERVE them exactly as they are in the translated output. Do not change their order or count."
+
+                translated_text = "{}"
+                print(f"{text_to_translate}")
+                if len(text_to_translate.replace("{}", "").strip()) > 0 and has_ukrainian_letter(text_to_translate):
+                    logger.info(f"Translating text: {text_to_translate}")
+                    response = await client.chat.completions.create(
+                        model=model,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": text_to_translate}
+                        ]
+                    )
+                    print(f"Content: {response.choices[0].message.content}")
+                    if response.choices[0].message.content is None:
+                        translated_text = text_to_translate
+                    else:
+                        translated_text = response.choices[0].message.content.strip()
+                else:
                     translated_text = text_to_translate
-                else:
-                    translated_text = response.choices[0].message.content.strip()
-            else:
-                translated_text = text_to_translate
 
-            if transliterated_values:
-                placeholder_count = translated_text.count("{}")
-                if placeholder_count == len(transliterated_values):
-                    translated_text = translated_text.format(*transliterated_values)
-                else:
-                    logger.warning(f"Placeholder mismatch: Text has {placeholder_count} '{{}}', but we have {len(transliterated_values)} values. Fallback: returning raw text.")
-                    return translated_text
+                if transliterated_values:
+                    placeholder_count = translated_text.count("{}")
+                    if placeholder_count == len(transliterated_values):
+                        translated_text = translated_text.format(*transliterated_values)
+                    else:
+                        logger.warning(f"Placeholder mismatch: Text has {placeholder_count} '{{}}', but we have {len(transliterated_values)} values. Fallback: returning raw text.")
+                        return translated_text
 
-            return translated_text
+                return translated_text
 
-        except Exception as e:
-            logger.error(f"LLM Translation Error: {str(e)}")
-            return f"[Translation Error: {str(e)}]"
+            except Exception as e:
+                logger.error(f"LLM Translation Error: {str(e)}")
+                return f"[Translation Error: {str(e)}]"
+
