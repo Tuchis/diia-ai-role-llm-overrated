@@ -97,10 +97,15 @@ def visualize_results(document: OCRDocument, output_path: Path):
 
     print("Saving image...")
     with tempfile.TemporaryDirectory() as tmpdirname:
-        painter.save(output_path)
-        # painter.save(f"{tmpdirname}/result.pdf")
-        # print(f"{output_path=}")
-        # with open(f"{tmpdirname}/result.pdf", "rb") as f:
-        #     s3.put_object(Bucket=bucket, Key=output_path, Body=f.read())
+        local_path = f"{tmpdirname}/result.pdf"
+        painter.save(local_path)
+        print(f"Uploading to S3: {output_path}")
+        with open(local_path, "rb") as f:
+            s3.put_object(
+                Bucket=bucket,
+                Key=output_path,
+                Body=f.read(),
+                ContentType='application/pdf'
+            )
 
 
