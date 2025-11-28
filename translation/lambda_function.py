@@ -13,12 +13,13 @@ import boto3
 
 
 dynamodb = boto3.resource("dynamodb")
+s3_client = boto3.client("s3")
 TABLE_NAME = "diia_hack_requests"
 table = dynamodb.Table(TABLE_NAME)
 
 
 def lambda_handler(event, context):
-    print(f"\n===Lambda for Translation===\n")
+    # print(f"\n===Lambda for Translation===\n")
 
     bucket = event.get("bucket")
     raw_key = event.get("raw_key", "")
@@ -31,7 +32,7 @@ def lambda_handler(event, context):
 
     # print(f"OCR Reulst {result}")
 
-    print(f"Incoming message: {incoming_message}")
+    # print(f"Incoming message: {incoming_message}")
 
     try:
         document = TranslationRequest(
@@ -40,7 +41,8 @@ def lambda_handler(event, context):
             content=result_json,
         )
 
-        # Process
+    # Process
+    try:
         result_translation = asyncio.run(translate_document(document, raw_key))
     except Exception as ex:
         response = table.update_item(
@@ -54,15 +56,32 @@ def lambda_handler(event, context):
             },
             ReturnValues="UPDATED_NEW",
         )
-        raise HTTPException(status_code=500, detail=str(ex))
+        print(f"Exception: {ex}")
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'detail': str(ex)})
+        }
 
-    print(f"{result_translation}")
-    print(f"{result}")
+    # print(f"{result_translation}")
+    # print(f"{result}")
+
+    print(result_translation)
+
+    # Store translation result in S3 to avoid payload size limits
+    intermediate_key = f"intermediate/{email}/{request_id}/translation.json"
+
+    s3_client.put_object(
+        Bucket=bucket,
+        Key=intermediate_key,
+        Body=result_translation.json(),
+        ContentType='application/json'
+    )
+
+    print(f"Translation result stored in S3: s3://{bucket}/{intermediate_key}")
 
     return {
         "bucket": bucket,
         "raw_key": raw_key,
-        "message": "OCR completed",
-        "result": result_translation.json(),
-        "previous": result
+        "intermediate_key": intermediate_key,
+        "message": "Translation completed"
     }
