@@ -42,7 +42,25 @@ class TranslationEngine:
                 "lapa": InferenceClient(model=MODEL_ENDPOINT,
                          token=TOKEN),
         }
-        self.semaphore = asyncio.Semaphore(5)
+        self._semaphore = None
+
+    @property
+    def semaphore(self):
+        """Lazy initialization of semaphore to ensure it's created in the correct event loop."""
+        try:
+            # Check if semaphore exists and is bound to the current event loop
+            if self._semaphore is not None:
+                # Try to get the current event loop
+                current_loop = asyncio.get_event_loop()
+                # If the semaphore's loop doesn't match, recreate it
+                if self._semaphore._loop is not current_loop:
+                    self._semaphore = asyncio.Semaphore(5)
+            else:
+                self._semaphore = asyncio.Semaphore(5)
+        except RuntimeError:
+            # No event loop in current thread, create semaphore anyway
+            self._semaphore = asyncio.Semaphore(5)
+        return self._semaphore
 
     async def process_document(self, data: Any, source: str, target: str, model: str, ignore_keys: list[str], full_text: str, use_ner: bool = True) -> Any:
         """
@@ -106,7 +124,7 @@ class TranslationEngine:
                 response_format={"type": "json_object"}
             )
 
-            print(f"Content top: {response.choices[0].message.content}")
+            # print(f"Content top: {response.choices[0].message.content}")
             content = response.choices[0].message.content.strip()
             if content.startswith("```json"):
                 content = content[7:-3]
@@ -155,7 +173,7 @@ class TranslationEngine:
                     system_prompt += " The text contains Python format placeholders '{}'. PRESERVE them exactly as they are in the translated output. Do not change their order or count."
 
                 translated_text = "{}"
-                print(f"{text_to_translate}")
+                # print(f"{text_to_translate}")
                 if len(text_to_translate.replace("{}", "").strip()) > 0 and has_ukrainian_letter(text_to_translate):
                     logger.info(f"Translating text: {text_to_translate}")
                     response = await client.chat.completions.create(
@@ -165,7 +183,7 @@ class TranslationEngine:
                             {"role": "user", "content": text_to_translate}
                         ]
                     )
-                    print(f"Content: {response.choices[0].message.content}")
+                    print(f"Content to translate {text_to_translate}, translated: {response.choices[0].message.content}")
                     if response.choices[0].message.content is None:
                         translated_text = text_to_translate
                     else:
