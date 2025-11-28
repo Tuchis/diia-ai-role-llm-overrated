@@ -46,7 +46,7 @@ async def translate_document(request: TranslationRequest, raw_key):
                 },
                 ReturnValues="UPDATED_NEW",
             )
-            print(response)
+            # print(response)
             raise HTTPException(status_code=400, detail="Content blocked by security policies.")
 
     except HTTPException:
@@ -72,7 +72,8 @@ async def translate_document(request: TranslationRequest, raw_key):
             request.source_lang, 
             request.target_lang,
             request.model,
-            request.ignore_keys
+            request.ignore_keys,
+            concatenated_text
         )
 
         return TranslationResponse(
